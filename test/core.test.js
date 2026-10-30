@@ -86,3 +86,12 @@ test('新網址參數', () => {
   assert.deepStrictEqual(d.deco, ['chest', 'coral', 'bubbler']);
   assert.strictEqual(d.event, 15);
 });
+
+test('水族箱範圍：預設全畫面、留白太多時等比例縮小', () => {
+  const d = C.readOptions('');
+  assert.deepStrictEqual([d.top, d.bottom, d.left, d.right], [0, 0, 0, 0]);
+  const o = C.readOptions('?top=0.6&left=0.5&right=0.5');
+  assert.strictEqual(o.top, 0.6);
+  assert.strictEqual(o.bottom, 0);
+  assert.ok(Math.abs(o.left - 0.425) < 1e-9 && Math.abs(o.right - 0.425) < 1e-9);
+});

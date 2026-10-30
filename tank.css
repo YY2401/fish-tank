@@ -34,7 +34,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   background: rgba(255, 255, 255, .95); color: #1b2733; font-size: 13px; box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
 }
 .demo.mini > :not(.demo-head) { display: none; }
-.demo.mini { width: auto; }
+.demo.mini { width: auto; right: auto; bottom: auto; left: 12px; top: 12px; } /* 收起時放左上，不擋到常放在下方的魚缸 */
 .demo.mini .demo-head { margin: 0; gap: 10px; }
 .demo-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 6px; }
 .demo .row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }

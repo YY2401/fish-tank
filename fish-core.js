@@ -182,13 +182,28 @@
     return null;
   }
 
+  // 上下（左右）留白加起來太多時等比例縮小，水族箱至少留畫面的 15%
+  function fitArea(top, bottom, left, right) {
+    const fit = (a, b) => {
+      const sum = a + b;
+      return sum > 0.85 ? [(a / sum) * 0.85, (b / sum) * 0.85] : [a, b];
+    };
+    const [t, bo] = fit(top, bottom);
+    const [l, r] = fit(left, right);
+    return { top: t, bottom: bo, left: l, right: r };
+  }
+
   // OBS 網址參數 → 設定
   const DEFAULTS = {
     channel: '',
     auto: true, // 在聊天室講話就自動變成魚（不用打 !魚）
     say: true, // 魚頭上顯示聊天內容
     bg: 'tank', // tank：完整水族箱背景 / none：透明，只畫魚和泡泡
-    top: 0, // 水面在畫面高度的哪裡（0～0.9），透明模式想讓魚只在下半部游就調高
+    // 水族箱範圍：上下左右各留白畫面的幾成（0～0.9）。都是 0 就是全畫面；不是全畫面時，完整背景模式會畫成一個玻璃魚缸
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     max: 60, // 最多幾隻魚，滿了就請最久沒講話的離開
     idle: 20, // 幾分鐘沒講話就游走
     scale: 1, // 魚的大小倍率
@@ -215,7 +230,7 @@
       auto: bool('auto'),
       say: bool('say'),
       bg: p.get('bg') === 'none' || p.get('bg') === '0' ? 'none' : 'tank',
-      top: num('top', 0, 0.9),
+      ...fitArea(num('top', 0, 0.9), num('bottom', 0, 0.9), num('left', 0, 0.9), num('right', 0, 0.9)),
       max: Math.round(num('max', 1, 200)),
       idle: num('idle', 1, 240),
       scale: num('scale', 0.4, 3),
@@ -243,5 +258,5 @@
     return common[hashStr(login) % common.length];
   }
 
-  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
+  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
 });

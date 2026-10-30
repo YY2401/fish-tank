@@ -11,6 +11,10 @@
 
   let W = 0, H = 0, DPR = 1, S = 1;
   let surfaceY = 0, floorY = 0;
+  let X0 = 0, X1 = 0, Y0 = 0, Y1 = 0, TW = 0; // 水族箱範圍（像素）
+  let DS = 1; // 裝飾的縮放
+  let boxed = false; // 不是全畫面時，完整背景模式畫成玻璃魚缸
+  const rx = (a, b) => X0 + TW * rand(a, b); // 水族箱寬度的幾成到幾成之間
   let bgLayer = null, decoLayer = null;
   let seaweed = [];
   let emitters = []; // 裝飾的冒泡點：{ x, y, kind }
@@ -83,10 +87,32 @@
     canvas.height = H * DPR;
     S = clamp(Math.min(W / 1280, H / 720), 0.45, 2.5);
     const tank = opt.bg === 'tank';
-    surfaceY = H * opt.top + (tank ? H * 0.07 : 12 * S);
-    floorY = H - (tank ? 46 * S : 16 * S);
+    X0 = W * opt.left;
+    X1 = W * (1 - opt.right);
+    Y0 = H * opt.top;
+    Y1 = H * (1 - opt.bottom);
+    TW = X1 - X0;
+    boxed = tank && (opt.top || opt.bottom || opt.left || opt.right) > 0;
+    surfaceY = Y0 + (tank ? Math.max((Y1 - Y0) * 0.07, 18 * S) : 12 * S);
+    floorY = Y1 - (tank ? 46 * S : 16 * S);
+    document.documentElement.classList.toggle('transparent', !tank || boxed);
+    placeOverlays();
     buildBackground();
     buildDecorations();
+  }
+
+  // 說明卡、橫幅、提示、狀態跟著水族箱範圍走
+  function placeOverlays() {
+    const set = (id, css) => Object.assign(document.getElementById(id).style, css);
+    set('tip', { left: X0 + 12 + 'px', bottom: H - Y1 + 12 + 'px' });
+    set('status', { right: W - X1 + 12 + 'px', top: Y0 + 12 + 'px' });
+    set('banner', { left: X0 + TW / 2 + 'px', top: Y0 + (Y1 - Y0) * 0.09 + 'px', maxWidth: TW * 0.9 + 'px' });
+    set('help', { left: X0 + TW / 2 + 'px', top: (Y0 + Y1) / 2 + 'px' });
+  }
+
+  function boxPath(b) {
+    b.beginPath();
+    b.roundRect(X0, Y0, TW, Y1 - Y0, boxed ? 16 * S : 0);
   }
 
   function layer() {
@@ -103,59 +129,90 @@
     if (opt.bg !== 'tank') { bgLayer = null; return; }
     const [c, b] = layer();
     bgLayer = c;
+    b.save();
+    boxPath(b);
+    b.clip();
     // 水面上方（空氣）
-    const air = b.createLinearGradient(0, 0, 0, surfaceY);
-    air.addColorStop(0, '#0b1622');
-    air.addColorStop(1, '#14324a');
+    const air = b.createLinearGradient(0, Y0, 0, surfaceY);
+    air.addColorStop(0, boxed ? 'rgba(20,50,74,0.35)' : '#0b1622');
+    air.addColorStop(1, boxed ? 'rgba(20,50,74,0.6)' : '#14324a');
     b.fillStyle = air;
-    b.fillRect(0, 0, W, surfaceY);
+    b.fillRect(X0, Y0, TW, surfaceY - Y0);
     // 水
-    const water = b.createLinearGradient(0, surfaceY, 0, H);
+    const water = b.createLinearGradient(0, surfaceY, 0, Y1);
     water.addColorStop(0, '#1d7fb0');
     water.addColorStop(0.45, '#0f5582');
     water.addColorStop(1, '#07304f');
     b.fillStyle = water;
-    b.fillRect(0, surfaceY, W, H - surfaceY);
+    b.fillRect(X0, surfaceY, TW, Y1 - surfaceY);
     // 沙
     b.beginPath();
-    b.moveTo(0, H);
-    for (let x = 0; x <= W + 20; x += 20) b.lineTo(x, floorY + 6 * S + Math.sin(x * 0.012) * 7 * S + Math.sin(x * 0.031) * 3 * S);
-    b.lineTo(W, H);
+    b.moveTo(X0, Y1);
+    for (let x = X0; x <= X1 + 20; x += 20) b.lineTo(x, floorY + 6 * S + Math.sin(x * 0.012) * 7 * S + Math.sin(x * 0.031) * 3 * S);
+    b.lineTo(X1, Y1);
     b.closePath();
-    const sand = b.createLinearGradient(0, floorY - 10 * S, 0, H);
+    const sand = b.createLinearGradient(0, floorY - 10 * S, 0, Y1);
     sand.addColorStop(0, '#d8bf86');
     sand.addColorStop(1, '#8f744a');
     b.fillStyle = sand;
     b.fill();
     // 沙上的小石頭與貝殼點點
-    for (let i = 0; i < W / 9; i++) {
+    for (let i = 0; i < TW / 9; i++) {
       b.fillStyle = `rgba(${Math.random() < 0.5 ? '90,70,40' : '250,235,200'},${rand(0.25, 0.6)})`;
       b.beginPath();
-      b.arc(rand(0, W), rand(floorY + 12 * S, H), rand(0.8, 2.4) * S, 0, TAU);
+      b.arc(rx(0, 1), rand(floorY + 12 * S, Y1), rand(0.8, 2.4) * S, 0, TAU);
       b.fill();
     }
     // 大石頭
-    const rocks = Math.max(2, Math.round(W / 420));
+    const rocks = Math.max(1, Math.round(TW / 420));
     for (let i = 0; i < rocks; i++) {
-      const rx = (i + 0.5) * (W / rocks) + rand(-80, 80) * S;
+      const x = X0 + (i + 0.5) * (TW / rocks) + rand(-80, 80) * S;
       const rw = rand(50, 90) * S, rh = rand(30, 55) * S;
-      const g = b.createLinearGradient(rx, floorY - rh, rx, floorY + 10 * S);
+      const g = b.createLinearGradient(x, floorY - rh, x, floorY + 10 * S);
       g.addColorStop(0, '#6d7a86');
       g.addColorStop(1, '#2f3942');
       b.fillStyle = g;
       b.beginPath();
-      b.ellipse(rx, floorY + 6 * S, rw, rh, 0, Math.PI, 0);
+      b.ellipse(x, floorY + 6 * S, rw, rh, 0, Math.PI, 0);
       b.fill();
     }
-    // 海草（會擺動，所以只記位置，每幀畫）
-    const n = Math.max(4, Math.round(W / 110));
+    b.restore();
+    if (boxed) drawGlass(b);
+    // 海草（會擺動，所以只記位置，每幀畫）；不比水深高
+    const n = Math.max(2, Math.round(TW / 110));
+    const maxH = (floorY - surfaceY) * 0.8;
     for (let i = 0; i < n; i++) {
       seaweed.push({
-        x: rand(0, W), h: rand(70, 190) * S, seg: 7, ph: rand(0, TAU),
+        x: rx(0.02, 0.98), h: Math.min(maxH, rand(70, 190) * S), seg: 7, ph: rand(0, TAU),
         color: Math.random() < 0.7 ? `hsl(${rand(120, 150)},55%,${rand(30, 42)}%)` : `hsl(${rand(340, 360)},55%,45%)`,
         w: rand(5, 9) * S,
       });
     }
+  }
+
+  // 玻璃魚缸外框：邊框、上緣、左邊的反光
+  function drawGlass(b) {
+    const r = 16 * S;
+    b.save();
+    boxPath(b);
+    b.lineWidth = 6 * S;
+    b.strokeStyle = 'rgba(200,235,255,0.55)';
+    b.stroke();
+    b.lineWidth = 2 * S;
+    b.strokeStyle = 'rgba(255,255,255,0.35)';
+    b.beginPath();
+    b.roundRect(X0 + 5 * S, Y0 + 5 * S, TW - 10 * S, Y1 - Y0 - 10 * S, r * 0.7);
+    b.stroke();
+    const shine = b.createLinearGradient(X0, 0, X0 + 40 * S, 0);
+    shine.addColorStop(0, 'rgba(255,255,255,0.18)');
+    shine.addColorStop(1, 'rgba(255,255,255,0)');
+    b.fillStyle = shine;
+    b.fillRect(X0 + 10 * S, Y0 + r, 40 * S, Y1 - Y0 - 2 * r);
+    b.fillStyle = '#23323f';
+    b.beginPath();
+    b.roundRect(X0 - 6 * S, Y0 - 8 * S, TW + 12 * S, 12 * S, 5 * S);
+    b.fill();
+    b.restore();
   }
 
   // ───────── 魚缸裝飾（城堡、寶箱、珊瑚、打氣石），透明模式也畫在底部 ─────────
@@ -166,16 +223,17 @@
     const [c, b] = layer();
     decoLayer = c;
     const n = opt.deco.length;
+    DS = S * clamp((floorY - surfaceY) / (420 * S), 0.4, 1); // 魚缸矮的時候裝飾跟著縮小
     const base = floorY + 8 * S;
     opt.deco.forEach((d, i) => {
       // 平均分散在底部，避開正中間（魚最常經過）
-      const x = W * ((i + 0.5) / n) * 0.84 + W * 0.08 + rand(-30, 30) * S;
+      const x = X0 + TW * ((i + 0.5) / n) * 0.84 + TW * 0.08 + rand(-30, 30) * S;
       ({ castle: drawCastle, chest: drawChestDeco, coral: drawCoral, bubbler: drawBubbler })[d](b, x, base);
     });
   }
 
   function drawCastle(b, x, base) {
-    const s = S * 1.1;
+    const s = DS * 1.1;
     const stone = b.createLinearGradient(0, base - 150 * s, 0, base);
     stone.addColorStop(0, '#a99cc0');
     stone.addColorStop(1, '#5d5470');
@@ -211,7 +269,7 @@
   }
 
   function drawChestDeco(b, x, base) {
-    const s = S * 1.2;
+    const s = DS * 1.2;
     const w = 70 * s, h = 34 * s;
     // 打開的蓋子
     b.fillStyle = '#7a4a22';
@@ -253,12 +311,12 @@
         branch(ex, ey, ang + rand(0.25, 0.6), len * 0.75, w * 0.72, color, depth - 1);
       }
     };
-    branch(x - 18 * S, base, -Math.PI / 2 - 0.15, 42 * S, 10 * S, '#ff7a9a', 3);
-    branch(x + 22 * S, base, -Math.PI / 2 + 0.2, 32 * S, 8 * S, '#ff9a4a', 3);
+    branch(x - 18 * DS, base, -Math.PI / 2 - 0.15, 42 * DS, 10 * DS, '#ff7a9a', 3);
+    branch(x + 22 * DS, base, -Math.PI / 2 + 0.2, 32 * DS, 8 * DS, '#ff9a4a', 3);
     b.fillStyle = '#ffb3c6';
     for (let i = 0; i < 6; i++) {
       b.beginPath();
-      b.arc(x + rand(-50, 50) * S, base - rand(0, 6) * S, rand(3, 6) * S, 0, TAU);
+      b.arc(x + rand(-50, 50) * DS, base - rand(0, 6) * DS, rand(3, 6) * DS, 0, TAU);
       b.fill();
     }
   }
@@ -266,13 +324,13 @@
   function drawBubbler(b, x, base) {
     b.fillStyle = '#5f6b75';
     b.beginPath();
-    b.ellipse(x, base - 4 * S, 16 * S, 9 * S, 0, 0, TAU);
+    b.ellipse(x, base - 4 * DS, 16 * DS, 9 * DS, 0, 0, TAU);
     b.fill();
     b.fillStyle = 'rgba(255,255,255,0.25)';
     b.beginPath();
-    b.ellipse(x - 4 * S, base - 8 * S, 6 * S, 3 * S, 0, 0, TAU);
+    b.ellipse(x - 4 * DS, base - 8 * DS, 6 * DS, 3 * DS, 0, 0, TAU);
     b.fill();
-    emitters.push({ x, y: base - 10 * S, kind: 'bubbler' });
+    emitters.push({ x, y: base - 10 * DS, kind: 'bubbler' });
   }
 
   // ───────── 顏色小工具 ─────────
@@ -322,7 +380,7 @@
       species: C.defaultSpecies(msg.login),
       color: null, size: 1, unlocked: [],
       hue: C.hashStr(msg.login) % 360,
-      x: rand(W * 0.1, W * 0.9),
+      x: rx(0.1, 0.9),
       y: surfaceY - 30 * S,
       vx: rand(-20, 20) * S, vy: 160 * S,
       dir: Math.random() < 0.5 ? -1 : 1, face: 1,
@@ -342,8 +400,8 @@
   }
 
   function pickTarget(f) {
-    const m = 60 * S;
-    f.tx = rand(m, W - m);
+    const m = Math.min(60 * S, TW * 0.25);
+    f.tx = rand(X0 + m, X1 - m);
     f.ty = rand(surfaceY + 40 * S, floorY - 30 * S);
     f.retarget = rand(4, 9);
   }
@@ -521,7 +579,7 @@
   function tankCommand(arg) {
     const a = arg.trim().toLowerCase();
     if (a === 'clear' || a === '清空') for (const f of fishes.values()) f.leaving = true;
-    else if (a === 'feed' || a === '餵') for (let i = 0; i < 6; i++) dropFood(rand(W * 0.1, W * 0.9), 5);
+    else if (a === 'feed' || a === '餵') for (let i = 0; i < 6; i++) dropFood(rx(0.1, 0.9), 5);
     else if (a === 'help' || a === '說明') showHelp();
     else if (a === 'shark' || a === '鯊魚') startEvent('shark');
     else if (a === 'whirl' || a === '漩渦') startEvent('whirl');
@@ -544,13 +602,13 @@
     const who = by && by.display ? by.display : '';
     if (type === 'shark') {
       const dir = Math.random() < 0.5 ? 1 : -1;
-      ev = { type, t: 0, dir, x: dir > 0 ? -260 * S : W + 260 * S, y: rand(surfaceY + 120 * S, floorY - 120 * S), L: 230 * S, chomped: 0, tail: 0 };
+      ev = { type, t: 0, dir, x: dir > 0 ? X0 - 260 * S : X1 + 260 * S, y: rand(surfaceY + 120 * S, floorY - 120 * S), L: 230 * S, chomped: 0, tail: 0 };
       banner(`🦈 鯊魚出沒！快逃！${who ? `（${who} 叫來的）` : ''}`);
     } else if (type === 'whirl') {
-      ev = { type, t: 0, dur: 8, cx: W / 2, cy: (surfaceY + floorY) / 2 };
+      ev = { type, t: 0, dur: 8, cx: X0 + TW / 2, cy: (surfaceY + floorY) / 2 };
       banner(`🌀 大漩渦來了！${who ? `（${who} 攪的）` : ''}`);
     } else if (type === 'treasure') {
-      ev = { type, t: 0, x: rand(W * 0.15, W * 0.85), y: surfaceY - 20 * S, landed: false };
+      ev = { type, t: 0, x: rx(0.15, 0.85), y: surfaceY - 20 * S, landed: false };
       banner(`💰 寶箱掉下來了！第一隻碰到的魚解鎖稀有魚種！${who ? `（${who} 丟的）` : ''}`);
     } else if (type === 'school') {
       const n = clamp(Math.round((by && by.viewers ? by.viewers : 20) / 2), 8, 40);
@@ -558,7 +616,7 @@
       const cy = rand(surfaceY + 100 * S, floorY - 100 * S);
       const school = [];
       for (let i = 0; i < n; i++) {
-        school.push({ x: (dir > 0 ? -80 : W + 80) * 1 - dir * rand(0, 360) * S, y: cy + rand(-90, 90) * S, ph: rand(0, TAU), c: hslHex(rand(0, 360), 80, 62) });
+        school.push({ x: (dir > 0 ? X0 - 80 * S : X1 + 80 * S) - dir * rand(0, 360) * S, y: cy + rand(-90, 90) * S, ph: rand(0, TAU), c: hslHex(rand(0, 360), 80, 62) });
       }
       schools.push({ dir, list: school, t: 0 });
       if (by && by.login) {
@@ -581,7 +639,7 @@
         p.x += sc.dir * 170 * S * dt;
         p.y += Math.sin(now / 400 + p.ph) * 20 * S * dt;
       }
-      if (sc.t > 4 && sc.list.every((p) => p.x < -100 || p.x > W + 100)) schools.splice(i, 1);
+      if (sc.t > 4 && sc.list.every((p) => p.x < X0 - 100 * S || p.x > X1 + 100 * S)) schools.splice(i, 1);
     }
     if (!ev) return;
     ev.t += dt;
@@ -607,7 +665,7 @@
           }
         }
       }
-      if ((ev.dir > 0 && ev.x > W + 300 * S) || (ev.dir < 0 && ev.x < -300 * S)) {
+      if ((ev.dir > 0 && ev.x > X1 + 300 * S) || (ev.dir < 0 && ev.x < X0 - 300 * S)) {
         for (const f of fishes.values()) f.chomped = false;
         ev = null;
       }
@@ -654,7 +712,7 @@
     }
   }
   function dropFood(x, n) {
-    for (let i = 0; i < n; i++) food.push({ x: clamp(x + rand(-40, 40) * S, 20, W - 20), y: surfaceY + rand(-10, 10) * S, ph: rand(0, TAU), life: 0 });
+    for (let i = 0; i < n; i++) food.push({ x: clamp(x + rand(-40, 40) * S, X0 + 20 * S, X1 - 20 * S), y: surfaceY + rand(-10, 10) * S, ph: rand(0, TAU), life: 0 });
   }
 
   // ───────── 模擬 ─────────
@@ -687,7 +745,7 @@
     }
 
     // 背景氣泡與裝飾冒泡
-    if (Math.random() < dt * 1.2 * (W / 1280)) bubble(rand(0, W), floorY, rand(1.5, 4) * S);
+    if (Math.random() < dt * 1.2 * (TW / 1280)) bubble(rx(0, 1), floorY, rand(1.5, 4) * S);
     for (const e of emitters) {
       const rate = e.kind === 'bubbler' ? 8 : e.kind === 'chest' ? 0.8 : 0.4;
       if (Math.random() < dt * rate) bubble(e.x + rand(-4, 4) * S, e.y, rand(1.5, e.kind === 'bubbler' ? 4 : 6) * S);
@@ -748,7 +806,7 @@
 
     // 大漩渦：所有魚繞著中心轉
     if (ev && ev.type === 'whirl' && !f.leaving && f.state !== 'jump') {
-      if (f.state !== 'whirl') { setState(f, 'whirl', 0); if (f.wa === undefined) { f.wa = Math.atan2(f.y - ev.cy, f.x - ev.cx); f.wr = Math.hypot(f.x - ev.cx, f.y - ev.cy); f.wTarget = rand(60, Math.min(W, H) * 0.42); } }
+      if (f.state !== 'whirl') { setState(f, 'whirl', 0); if (f.wa === undefined) { f.wa = Math.atan2(f.y - ev.cy, f.x - ev.cx); f.wr = Math.hypot(f.x - ev.cx, f.y - ev.cy); const room = Math.min(TW, floorY - surfaceY) * 0.42; f.wTarget = rand(Math.min(60 * S, room * 0.4), room); } }
       const ramp = Math.min(1, ev.t / 1.5) * Math.min(1, (ev.dur - ev.t) / 1.2 + 0.2);
       f.wa += dt * 2.6 * ramp * (140 * S / Math.max(60 * S, f.wr));
       f.wr += (f.wTarget - f.wr) * dt * 0.8;
@@ -853,7 +911,7 @@
       speed = base * 3.5;
       steer = 5;
     }
-    if (f.leaving) { tx = f.dir > 0 ? W + 300 : -300; ty = f.y; speed = base * 1.5; }
+    if (f.leaving) { tx = f.dir > 0 ? X1 + 300 * S : X0 - 300 * S; ty = f.y; speed = base * 1.5; }
 
     if (f.state !== 'jump' && f.state !== 'enter') {
       const dx = tx - f.x, dy = ty - f.y;
@@ -867,7 +925,7 @@
 
     f.x += f.vx * dt;
     f.y += f.vy * dt;
-    if (!f.leaving) f.x = clamp(f.x, L * 0.5, W - L * 0.5);
+    if (!f.leaving) f.x = TW > L ? clamp(f.x, X0 + L * 0.5, X1 - L * 0.5) : X0 + TW / 2;
     if (f.state !== 'jump' && f.state !== 'enter') f.y = clamp(f.y, surfaceY + L * 0.35, floorY - L * 0.3);
     if ((prevY - surfaceY) * (f.y - surfaceY) < 0 && f.state === 'jump') splash(f.x, surfaceY, 12);
 
@@ -889,11 +947,20 @@
     ctx.clearRect(0, 0, W, H);
     if (bgLayer) {
       ctx.drawImage(bgLayer, 0, 0, W, H);
+      ctx.save();
+      boxPath(ctx);
+      ctx.clip();
       drawRays(t);
+      ctx.restore();
     }
     drawSurface(t);
     for (const w of seaweed) drawSeaweed(w, t);
     if (decoLayer) ctx.drawImage(decoLayer, 0, 0, W, H);
+    // 魚、鯊魚、魚群只畫在水族箱左右邊界內（游出去就消失）；往上跳可以跳出魚缸
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(X0, -H, TW, Y1 + H);
+    ctx.clip();
     if (ev && ev.type === 'whirl') drawWhirl(t);
 
     for (const p of food) {
@@ -910,6 +977,7 @@
     for (const f of list) drawFish(f, t);
     if (ev && ev.type === 'shark') drawBigShark();
     for (const p of parts) drawPart(p);
+    ctx.restore();
     drawLabels(list);
   }
 
@@ -917,8 +985,8 @@
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 5; i++) {
-      const x = ((i + 0.5) / 5) * W + Math.sin(t * 0.2 + i * 1.7) * 80 * S;
-      const w = (60 + 40 * Math.sin(t * 0.3 + i)) * S;
+      const x = X0 + ((i + 0.5) / 5) * TW + Math.sin(t * 0.2 + i * 1.7) * 80 * S;
+      const w = (60 + 40 * Math.sin(t * 0.3 + i)) * S * Math.min(1, TW / 800);
       const g = ctx.createLinearGradient(0, surfaceY, 0, floorY);
       g.addColorStop(0, 'rgba(160,220,255,0.10)');
       g.addColorStop(1, 'rgba(160,220,255,0)');
@@ -939,9 +1007,9 @@
     ctx.strokeStyle = 'rgba(200,240,255,0.55)';
     ctx.lineWidth = 2 * S;
     ctx.beginPath();
-    for (let x = 0; x <= W + 10; x += 10) {
+    for (let x = X0; x <= X1; x += 10) {
       const y = surfaceY + Math.sin(x * 0.02 + t * 2) * 2.5 * S + Math.sin(x * 0.007 - t * 1.3) * 3 * S;
-      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      x === X0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
     ctx.restore();
@@ -1676,7 +1744,6 @@
   // ───────── 啟動 ─────────
   window.addEventListener('resize', resize);
   resize();
-  document.documentElement.classList.toggle('transparent', opt.bg !== 'tank');
   if (opt.demo) setupDemo();
   if (opt.channel) {
     connectChat(opt.channel, handleChat, (s) => {

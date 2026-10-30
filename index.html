@@ -35,6 +35,11 @@
   td:first-child { color: var(--accent); font-weight: 700; padding-right: 12px; }
   ol { margin: 0 0 10px; padding-left: 1.3em; }
   ol li { margin-bottom: 6px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+  .presets button { padding: 4px 10px; font-size: 13px; }
+  .area { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .area label { margin-bottom: 6px; }
+  .area input { width: 100%; }
   .rewards { display: grid; gap: 6px; margin: 8px 0; }
   .reward { display: grid; grid-template-columns: 1fr 140px auto; gap: 6px; align-items: center; background: #071c2e; border-radius: 8px; padding: 6px 8px; }
   .reward b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -62,7 +67,21 @@
       <label><span>背景</span>
         <select id="bg"><option value="tank">完整水族箱（全畫面場景）</option><option value="none">透明（疊在遊戲畫面上）</option></select>
       </label>
-      <label><span>水面高度：<b id="topV"></b></span><input type="range" id="top" min="0" max="0.8" step="0.05" value="0"><em>透明模式想讓魚只在畫面下方游，就往右拉</em></label>
+      <div class="lbl">水族箱範圍</div>
+      <em>魚只會在這個範圍裡游。不是全畫面時，完整背景模式會畫成一個玻璃魚缸，其他地方透明，可以疊在遊戲畫面上。</em>
+      <div class="presets">
+        <button type="button" class="ghost" data-area="0,0,0,0">全畫面</button>
+        <button type="button" class="ghost" data-area="0.7,0,0,0">下方長條</button>
+        <button type="button" class="ghost" data-area="0.55,0.03,0.6,0.02">右下角</button>
+        <button type="button" class="ghost" data-area="0.55,0.03,0.02,0.6">左下角</button>
+        <button type="button" class="ghost" data-area="0.03,0.55,0.6,0.02">右上角</button>
+      </div>
+      <div class="area">
+        <label><span>上方留白 <b id="topV"></b></span><input type="range" id="top" min="0" max="0.85" step="0.01" value="0"></label>
+        <label><span>下方留白 <b id="bottomV"></b></span><input type="range" id="bottom" min="0" max="0.85" step="0.01" value="0"></label>
+        <label><span>左邊留白 <b id="leftV"></b></span><input type="range" id="left" min="0" max="0.85" step="0.01" value="0"></label>
+        <label><span>右邊留白 <b id="rightV"></b></span><input type="range" id="right" min="0" max="0.85" step="0.01" value="0"></label>
+      </div>
       <label><span>魚的大小：<b id="scaleV"></b></span><input type="range" id="scale" min="0.5" max="2" step="0.1" value="1"></label>
       <label><span>最多幾隻魚</span><input type="number" id="max" min="1" max="200" value="60"></label>
       <label><span>幾分鐘沒講話就游走</span><input type="number" id="idle" min="1" max="240" value="20"></label>
@@ -134,7 +153,7 @@
 <script>
   const C = FishCore;
   const $ = (id) => document.getElementById(id);
-  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store'];
+  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store'];
   const SAVE = 'fishtank.setup.v1';
   let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '' };
 
@@ -169,7 +188,7 @@
     if (!$('say').checked) p.set('say', '0');
     if (!$('tip').checked) p.set('tip', '0');
     if ($('bg').value !== 'tank') p.set('bg', 'none');
-    if (+$('top').value) p.set('top', $('top').value);
+    for (const k of ['top', 'bottom', 'left', 'right']) if (+$(k).value) p.set(k, $(k).value);
     if (+$('scale').value !== 1) p.set('scale', $('scale').value);
     if (+$('max').value !== 60) p.set('max', $('max').value);
     if (+$('idle').value !== 20) p.set('idle', $('idle').value);
@@ -186,7 +205,7 @@
 
   let timer = 0;
   function refresh() {
-    $('topV').textContent = Math.round($('top').value * 100) + '%';
+    for (const k of ['top', 'bottom', 'left', 'right']) $(k + 'V').textContent = Math.round($(k).value * 100) + '%';
     $('scaleV').textContent = $('scale').value + ' 倍';
     $('url').value = new URL('tank.html', location.href).href + '?' + params(false);
     const s = { state };
@@ -282,6 +301,12 @@
     refresh();
   });
 
+  for (const b of document.querySelectorAll('[data-area]')) {
+    b.addEventListener('click', () => {
+      b.dataset.area.split(',').forEach((v, i) => ($(['top', 'bottom', 'left', 'right'][i]).value = v));
+      refresh();
+    });
+  }
   $('copy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText($('url').value); } catch { $('url').select(); document.execCommand('copy'); }
     $('copy').textContent = '已複製';
