@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>教學影片用的投影片</title>
+<style>
+  /* 給 walkthrough.mjs 錄影用：?img=圖檔&box=x,y,w,h（原圖像素）→ 圖片置中、要點的地方放一個 #hl 讓錄影框起來
+     ?text=… 則是純文字卡（多行用 | 分隔） */
+  html, body { margin: 0; height: 100%; background: #1b232c; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  .stage { position: fixed; left: 0; right: 0; top: 0; bottom: 96px; display: flex; align-items: center; justify-content: center; }
+  img { max-width: 92%; max-height: 92%; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); border-radius: 6px; }
+  #hl { position: fixed; }
+  .card { color: #fff; font-size: 34px; line-height: 1.9; }
+  .card b { color: #ffd84a; }
+  .card div { display: flex; gap: 24px; }
+  .card div span:first-child { min-width: 5em; color: #9fc3dd; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<div id="hl"></div>
+<script>
+  const p = new URLSearchParams(location.search);
+  const stage = document.getElementById('stage');
+  if (p.get('img')) {
+    const img = new Image();
+    img.src = p.get('img');
+    stage.append(img);
+    img.onload = () => {
+      const box = (p.get('box') || '').split(',').map(Number);
+      if (box.length !== 4) return;
+      const r = img.getBoundingClientRect();
+      const k = r.width / img.naturalWidth;
+      Object.assign(document.getElementById('hl').style, { left: r.left + box[0] * k + 'px', top: r.top + box[1] * k + 'px', width: box[2] * k + 'px', height: box[3] * k + 'px' });
+    };
+  } else {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card';
+    for (const line of (p.get('text') || '').split('|')) {
+      const row = document.createElement('div');
+      const [a, b] = line.split('=');
+      row.innerHTML = b === undefined ? `<span>${a}</span>` : `<span>${a}</span><span><b>${b}</b></span>`;
+      card.append(row);
+    }
+    stage.append(card);
+  }
+</script>
+</body>
+</html>

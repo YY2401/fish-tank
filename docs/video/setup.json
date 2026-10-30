@@ -1,0 +1,26 @@
+{
+  "title": "直播水族箱 設定教學",
+  "subtitle": "約 1 分鐘：設定頁 → OBS，觀眾就能變成魚",
+  "baseUrl": "https://yy2401.github.io/fish-tank/",
+  "viewport": [1280, 760],
+  "defaultDuration": 4.5,
+  "steps": [
+    { "goto": "index.html", "caption": "用 Chrome 打開 yy2401.github.io/fish-tank，這是設定頁", "duration": 4 },
+    { "caption": "在「Twitch 頻道名稱」填你的頻道名稱（twitch.tv/ 後面那段），不用登入", "highlight": "#channel",
+      "before": [{ "fill": ["#channel", "yy2401"] }] },
+    { "caption": "想放在畫面角落：「水族箱範圍」按「右下角」，其他地方會變透明", "highlight": ".presets",
+      "before": [{ "click": "[data-area=\"0.55,0.03,0.6,0.02\"]" }, { "wait": 1500 }], "duration": 5.5 },
+    { "caption": "勾選魚缸裝飾，設定大事件（鯊魚、漩渦、寶箱）多久來一次", "highlight": "#decos" },
+    { "caption": "稀有魚種：訂閱、贊助小奇點、兌換忠誠點、搶寶箱都能解鎖", "highlight": "#bits", "duration": 5, "before": [{ "scroll": "#listenText" }] },
+    { "caption": "設定好了，到右上「5. 複製到 OBS」按「複製」", "highlight": "#copy" },
+    { "goto": "docs/video/slide.html?img=1-sources.jpg&box=212,900,26,22", "caption": "打開 OBS，在下方「來源」區塊按「＋」", "highlight": "#hl" },
+    { "goto": "docs/video/slide.html?img=2-add.jpg&box=17,607,283,43", "caption": "左邊選「瀏覽器」", "highlight": "#hl" },
+    { "goto": "docs/video/slide.html?img=3-new.jpg&box=345,115,1011,76", "caption": "按「＋ 建立新來源」（舊版 OBS 會先問名稱：填「水族箱」，按確定）", "highlight": "#hl", "duration": 5.5 },
+    { "goto": "docs/video/slide.html?text=網址=按 Ctrl%2BV 貼上剛剛複製的網址|寬度=1920|高度=1080|最後=按「確定」", "caption": "在屬性視窗填這三格，按「確定」", "highlight": "#card", "duration": 6 },
+    { "goto": "tank.html?demo=1&event=0", "caption": "完成！先用右下角的「測試聊天室」自己試玩：點指令，或按最下面的「加 8 隻測試魚」", "highlight": "#demo .chips",
+      "after": [{ "click": "[data-act=bots]" }, { "wait": 6000 }], "duration": 6 },
+    { "caption": "觀眾在聊天室講話或打 !魚，就會變成一隻魚游進你的直播畫面", "duration": 5,
+      "before": [{ "click": "[data-act=bots]" }, { "wait": 5000 }] }
+  ],
+  "outro": "完整說明請看《直播水族箱 使用說明書》"
+}

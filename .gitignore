@@ -2,3 +2,5 @@
 node_modules/
 .claude/
 docs/*_check/
+docs/video/*_frames/
+docs/video/*_manual.json
