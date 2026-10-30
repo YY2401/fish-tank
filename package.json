@@ -5,6 +5,11 @@
   "description": "直播互動水族箱：Twitch 觀眾在聊天室打指令變成魚（純靜態，OBS 瀏覽器來源）",
   "scripts": {
     "start": "python -m http.server 3010",
-    "test": "node --test test/core.test.js test/sheet-script.test.js"
+    "test": "node --test test/core.test.js test/sheet-script.test.js",
+    "test:e2e": "node --test --test-concurrency=1 test/e2e/tank.test.js test/e2e/setup.test.js",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.43.1"
   }
 }

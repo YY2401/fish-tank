@@ -553,6 +553,7 @@
         for (let i = 0; i < 8; i++) bubble(f.x + f.dir * bodyLen(f) * 0.45, f.y, rand(2, 6) * S, i * 0.08);
         break;
       case 'feed':
+        wake();
         dropFood(f.x + rand(-80, 80) * S, 6);
         break;
       case 'follow':
@@ -852,7 +853,7 @@
       case 'sleep':
         tx = f.x;
         ty = floorY - L * 0.35;
-        speed = base * 0.4;
+        speed = base * 1.2; // 慢慢沉下去，幾秒內到底
         f.zz -= dt;
         if (f.zz <= 0) { f.zz = 1.1; parts.push({ k: 'text', t: 'z', color: '#e8f4ff', x: f.x + f.dir * L * 0.3, y: f.y - L * 0.3, vx: 10 * S, vy: -25 * S, r: rand(12, 18) * S, life: 0, max: 2 }); }
         if (f.st <= 0) setState(f, 'swim', 0);
@@ -889,7 +890,7 @@
           const p = nearestFood(f);
           if (p) {
             tx = p.x; ty = p.y; speed = base * 1.8;
-            if (Math.hypot(p.x - f.x - f.dir * L * 0.4, p.y - f.y) < L * 0.35) {
+            if (Math.hypot(p.x - f.x, p.y - f.y) < L * 0.5) { // 碰到身體就算吃到（只看嘴巴的話，魚停在飼料正上方會一直吃不到）
               food.splice(food.indexOf(p), 1);
               f.size = Math.min(2, f.size + 0.04);
               saveProfile(f);
@@ -1568,8 +1569,10 @@
   }
 
   // 名字與泡泡排版：先放泡泡（最新的優先），再放名字；疊到已經放好的就藏起來（淡出），不會擠成一團
+  let lastPlaced = []; // 上一幀放好的名字與泡泡（自動測試檢查有沒有重疊）
   function drawLabels(list) {
     const placed = [];
+    lastPlaced = placed;
     const hit = (r) => placed.some((p) => r.x < p.x + p.w && r.x + r.w > p.x && r.y < p.y + p.h && r.y + r.h > p.y);
     const fadeStep = Math.min(1, frameDt * 6);
     ctx.save();
@@ -1589,7 +1592,7 @@
       let box = null;
       for (const k of [f.slot, 0, 1, 2, 3]) {
         const r = { x: bx, y: Math.max(4, baseY - k * (bh + 6 * S)), w: bw, h: bh + 8 * S };
-        if (!hit(r)) { box = r; f.slot = k; break; }
+        if (!hit(r)) { box = { ...r, kind: 'say' }; f.slot = k; break; }
       }
       if (!box) continue;
       placed.push(box);
@@ -1760,10 +1763,11 @@
   }
 
   let last = performance.now();
+  let skew = 0; // 自動測試快轉的時間（毫秒）
   function frame(ts) {
     const dt = Math.min(0.05, (ts - last) / 1000);
     last = ts;
-    now = ts;
+    now = ts + skew;
     frameDt = dt;
     update(dt);
     draw();
@@ -1771,5 +1775,13 @@
   }
   requestAnimationFrame(frame);
 
-  window.FishTank = { handleChat, startEvent, fishes, opt }; // 方便除錯與自動測試
+  // 方便除錯與自動測試：advance(秒) 直接快轉模擬，不用真的等
+  window.FishTank = {
+    handleChat, startEvent, fishes, opt,
+    advance(sec) {
+      for (let i = 0; i < sec * 60; i++) { skew += 1000 / 60; now = performance.now() + skew; update(1 / 60); }
+      draw();
+    },
+    peek: () => ({ ev: ev && ev.type, food: food.length, schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
+  };
 })();

@@ -11,5 +11,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
       - name: 單元測試（核心邏輯、Apps Script）
         run: npm test
+      - name: 瀏覽器測試（真實 Chrome：水族箱畫面、設定頁）
+        run: npm run test:e2e
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
