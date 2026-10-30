@@ -53,8 +53,12 @@ const FAKE_TWITCH = `(() => {
   window.__twitch = { sockets, say: (line) => sockets.forEach((s) => s.emit(line)) };
 })();`;
 
+// 1×1 的 PNG：測試用的「圖片」（自訂魚種、表情符號、大頭貼）
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP438DwHwAGgAJ/EEwb4QAAAABJRU5ErkJggg==', 'base64');
+
 // opts.twitch：換成假聊天室；opts.sheet(body) → 回應 JSON：攔截送到 Google Apps Script 的請求
-async function newPage(browser, { width = 1280, height = 720, twitch = false, sheet = null } = {}) {
+// opts.routes：{ 網址開頭: { body, contentType } }，其他外部網址（圖片、decapi）用假的回應
+async function newPage(browser, { width = 1280, height = 720, twitch = false, sheet = null, routes = {} } = {}) {
   const page = await browser.newPage();
   await page.setViewport({ width, height });
   page.errors = [];
@@ -70,6 +74,12 @@ async function newPage(browser, { width = 1280, height = 720, twitch = false, sh
       const out = sheet(JSON.parse(req.postData() || '{}'));
       return req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(out) });
     }
+    const hit = Object.keys(routes).find((prefix) => u.startsWith(prefix));
+    if (hit) {
+      page.requested = [...(page.requested || []), u];
+      return req.respond({ status: 200, contentType: routes[hit].contentType || 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: routes[hit].body ?? PNG });
+    }
+    if (!u.startsWith('http://127.0.0.1')) return req.abort(); // 測試不連外
     return req.continue();
   });
   return page;
@@ -77,4 +87,4 @@ async function newPage(browser, { width = 1280, height = 720, twitch = false, sh
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { chromePath, serve, launch, newPage, sleep, FAKE_TWITCH };
+module.exports = { chromePath, serve, launch, newPage, sleep, FAKE_TWITCH, PNG };

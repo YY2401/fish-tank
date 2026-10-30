@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180">
+  <!-- 教學示範用的自訂魚種：小雞魚（自己畫的），魚頭朝右 -->
+  <path d="M40 90 L6 58 Q18 90 6 122 Z" fill="#f5b52e"/>
+  <ellipse cx="120" cy="92" rx="82" ry="62" fill="#ffd84a"/>
+  <ellipse cx="108" cy="112" rx="40" ry="24" fill="#ffe98f"/>
+  <path d="M96 40 Q106 12 118 34 Q126 10 136 36" fill="none" stroke="#f5b52e" stroke-width="8" stroke-linecap="round"/>
+  <path d="M86 98 Q112 128 132 100" fill="#f5b52e"/>
+  <circle cx="160" cy="76" r="15" fill="#fff"/>
+  <circle cx="164" cy="76" r="9" fill="#1d1d24"/>
+  <circle cx="167" cy="72" r="3" fill="#fff"/>
+  <path d="M196 84 L230 94 L196 106 Z" fill="#ff8a2a"/>
+  <ellipse cx="150" cy="104" rx="11" ry="6" fill="#ff9aa8" opacity=".7"/>
+</svg>

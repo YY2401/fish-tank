@@ -9,6 +9,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const STORE = 'https://script.google.com/macros/s/AKfycb-example/exec';
 // 教學裡的觀眾名字（看起來像真的聊天室）
 const VIEWERS = ['小魚乾', '阿宅不睡覺', 'Momo_TW', '路過的貓', 'kiwi_kiwi', '布丁狗', '大吉大利', 'SunnyDay', '奶茶三分糖', 'Leo0218', '海綿寶寶粉', '雞排不加辣', 'yuki_chan', '熬夜冠軍', '蛋餅王', 'ChillGuy', '芒果冰', '小籠包', 'Neko123', '水母控'];
+// 示範用的圖（自己畫的，不用 Twitch 真的表情或別人的大頭貼）：外部圖片網址都換成這幾張
+const SAMPLE = (f) => fs.readFileSync(path.join(__dirname, 'samples', f));
+const IMAGES = {
+  'https://img.example.com/chick.png': 'chick.svg',
+  'https://static-cdn.jtvnw.net/emoticons/': 'smile.svg',
+  'https://static-cdn.jtvnw.net/jtv_user_pictures/': 'pfp.svg',
+};
+const CHICK = 'https://img.example.com/chick.png';
 const LINES = ['晚安～', '這魚缸好可愛', '我是哪一隻', '+1', '主播加油', '哈哈哈哈', '今天玩什麼', '好療癒'];
 
 async function newPage(browser, w, h, scale = 2) {
@@ -17,9 +25,15 @@ async function newPage(browser, w, h, scale = 2) {
   await page.evaluateOnNewDocument(H.FAKE_TWITCH);
   await page.setRequestInterception(true);
   page.on('request', (req) => {
-    if (req.url().startsWith('https://script.google.com/')) {
+    const u = req.url();
+    if (u.startsWith('https://script.google.com/')) {
       return req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, profiles: { a: {}, b: {}, c: {} } }) });
     }
+    if (u.startsWith('https://decapi.me/')) {
+      return req.respond({ status: 200, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' }, body: 'https://static-cdn.jtvnw.net/jtv_user_pictures/demo-profile_image.png' });
+    }
+    const img = Object.keys(IMAGES).find((k) => u.startsWith(k));
+    if (img) return req.respond({ status: 200, contentType: 'image/svg+xml', headers: { 'Access-Control-Allow-Origin': '*' }, body: SAMPLE(IMAGES[img]) });
     return req.continue();
   });
   return page;
@@ -87,20 +101,29 @@ async function shotPage(page, name) {
   await mark(page, ['#decos', '#event']);
   await shotEl(page, 'setup-deco', leftSec(2));
 
+  await page.type('#skinName', '小雞');
+  await page.type('#skinUrl', CHICK);
+  await page.click('#skinAdd');
+  await page.waitForFunction(() => { const i = document.querySelector('#skins img'); return i && i.naturalWidth; });
+  await mark(page, ['#skins .skin', '.skin-add']);
+  await shotRange(page, 'setup-skins', `${leftSec(3)} h2`, '#skinMsg', 14, 1);
+  await mark(page, ['#pfp']);
+  await shotRange(page, 'setup-avatar', '#avatarLbl', 'label:has(#pfp)');
+
   await page.waitForFunction(() => /正在偵測/.test(document.getElementById('listenText').textContent));
   await page.evaluate(() => window.__twitch.say('@custom-reward-id=8f2c41d0-6a1e-4b8e-9c55-2d7f0e3a9b12;display-name=小魚乾 :fish01!fish01@fish01.tmi.twitch.tv PRIVMSG #yy2401 :鯨魚'));
   await page.waitForSelector('#rewards .reward');
   await page.select('#rewards .reward select', 'rare');
   await mark(page, ['#rewards .reward']);
-  await shotRange(page, 'setup-rare', `${leftSec(3)} .lbl`, '#rewards');
+  await shotRange(page, 'setup-rare', `${leftSec(4)} .lbl`, '#rewards');
 
   await mark(page, ['#copyScript']);
-  await shotRange(page, 'setup-sheet-copy', `${leftSec(4)} ol li:nth-child(1)`, `${leftSec(4)} ol li:nth-child(2)`, 10, 6);
+  await shotRange(page, 'setup-sheet-copy', `${leftSec(5)} ol li:nth-child(1)`, `${leftSec(5)} ol li:nth-child(2)`, 10, 6);
   await page.type('#store', STORE);
   await page.click('#testStore');
   await page.waitForFunction(() => /連上了/.test(document.getElementById('storeMsg').textContent));
   await mark(page, ['#store', '#testStore', '#storeMsg']);
-  await shotRange(page, 'setup-sheet-test', `${leftSec(4)} ol li:nth-child(3)`, '#storeMsg', 10, 8);
+  await shotRange(page, 'setup-sheet-test', `${leftSec(5)} ol li:nth-child(3)`, '#storeMsg', 10, 8);
   // 試算表截完就清掉，後面的 OBS 網址比較短
   await page.click('#store', { clickCount: 3 });
   await page.keyboard.press('Backspace');
@@ -170,6 +193,31 @@ async function shotPage(page, name) {
   await tank.evaluate(() => FishTank.handleChat({ login: 'v2', display: 'Momo_TW', text: '!fishhelp', badges: {} }));
   await sleep(600);
   await shotPage(tank, 'tank-help');
+
+  // 自訂魚種與頭像
+  await openTank(`deco=coral,bubbler&tip=0&skin=${encodeURIComponent('小雞|' + CHICK)}`);
+  await fill(12);
+  await tank.evaluate(() => FishTank.advance(6)); // 換魚種有 5 秒冷卻
+  await tank.evaluate(() => {
+    const say = (i, name, text, tags) => FishTank.handleChat({ login: 'v' + i, display: name, text, badges: {}, tags });
+    say(0, '小魚乾', '!小雞'); say(4, 'kiwi_kiwi', '!小雞'); say(9, 'Leo0218', '!小雞');
+    say(2, 'Momo_TW', '!頭像 :)', { emotes: '1:4-5' }); say(6, '大吉大利', '!頭像 :)', { emotes: '1:4-5' });
+    say(0, '小魚乾', '!頭像 :)', { emotes: '1:4-5' });
+    say(5, '布丁狗', '!頭像 大頭貼'); say(10, '海綿寶寶粉', '!頭像 大頭貼');
+  });
+  await sleep(800);
+  await tank.evaluate(() => FishTank.advance(10));
+  await sleep(600);
+  // 只截魚最多的中間那塊，說明書裡才看得清楚小雞和頭像
+  const box = await tank.evaluate(() => {
+    const fs = [...FishTank.fishes.values()];
+    const xs = fs.map((f) => f.x), ys = fs.map((f) => f.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const w = 760, h = 430;
+    return { x: Math.max(0, Math.min(innerWidth - w, cx - w / 2)), y: Math.max(0, Math.min(innerHeight - h, cy - h / 2)), width: w, height: h };
+  });
+  await tank.screenshot({ path: path.join(OUT, 'tank-custom.png'), clip: box });
+  console.log('shot tank-custom');
 
   // 角落魚缸疊在遊戲畫面上（背景用一張示意的遊戲畫面）
   await openTank('deco=castle,coral,bubbler&top=0.5&bottom=0.03&left=0.55&right=0.02&tip=1');

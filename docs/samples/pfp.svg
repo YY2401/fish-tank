@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <!-- 教學示範用的「大頭貼」（自己畫的） -->
+  <rect width="300" height="300" fill="#7a5cff"/>
+  <circle cx="150" cy="120" r="56" fill="#ffe0c2"/>
+  <path d="M60 300 Q60 196 150 196 Q240 196 240 300 Z" fill="#ffe0c2"/>
+  <path d="M94 110 Q100 52 150 56 Q206 54 208 114 Q180 84 150 92 Q118 84 94 110 Z" fill="#3b2a20"/>
+  <circle cx="128" cy="124" r="7" fill="#2a1d14"/>
+  <circle cx="172" cy="124" r="7" fill="#2a1d14"/>
+  <path d="M130 148 Q150 164 170 148" fill="none" stroke="#c0584a" stroke-width="6" stroke-linecap="round"/>
+</svg>

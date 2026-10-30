@@ -15,7 +15,19 @@ const NAMES = ['小魚乾', '阿宅不睡覺', 'Momo_TW', '路過的貓', 'kiwi_
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 720 });
   await page.evaluateOnNewDocument(H.FAKE_TWITCH);
-  await page.goto(`${srv.url}/tank.html?channel=yy2401&event=0&tip=0&scale=1.4&deco=castle,chest,coral,bubbler`, { waitUntil: 'networkidle0' });
+  // 自訂魚種、表情符號、大頭貼都用 docs/samples 裡自己畫的示範圖
+  const sample = (f) => fs.readFileSync(path.join(__dirname, '..', 'samples', f));
+  const IMAGES = { 'https://img.example.com/chick.png': 'chick.svg', 'https://static-cdn.jtvnw.net/emoticons/': 'smile.svg', 'https://static-cdn.jtvnw.net/jtv_user_pictures/': 'pfp.svg' };
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const u = req.url();
+    if (u.startsWith('https://decapi.me/')) return req.respond({ status: 200, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' }, body: 'https://static-cdn.jtvnw.net/jtv_user_pictures/demo.png' });
+    const hit = Object.keys(IMAGES).find((k) => u.startsWith(k));
+    if (hit) return req.respond({ status: 200, contentType: 'image/svg+xml', headers: { 'Access-Control-Allow-Origin': '*' }, body: sample(IMAGES[hit]) });
+    return req.continue();
+  });
+  const skin = encodeURIComponent('小雞|https://img.example.com/chick.png');
+  await page.goto(`${srv.url}/tank.html?channel=yy2401&event=0&tip=0&scale=1.4&deco=castle,chest,coral,bubbler&skin=${skin}`, { waitUntil: 'networkidle0' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForFunction(() => window.FishTank);
@@ -24,7 +36,7 @@ const NAMES = ['小魚乾', '阿宅不睡覺', 'Momo_TW', '路過的貓', 'kiwi_
     #cap{position:fixed;left:0;right:0;bottom:0;padding:14px 28px 18px;background:rgba(20,30,42,.88);color:#fff;font:500 24px/1.5 "Noto Sans TC",sans-serif;z-index:99;transition:opacity .3s}` });
   await page.evaluate(() => { const d = document.createElement('div'); d.id = 'cap'; d.style.opacity = 0; document.body.append(d); });
   const cap = (t) => page.evaluate((t) => { const d = document.getElementById('cap'); d.textContent = t; d.style.opacity = t ? 1 : 0; }, t);
-  const chat = (i, text, badges = {}) => page.evaluate((login, display, text, badges) => FishTank.handleChat({ login, display, text, badges }), 'v' + i, NAMES[i], text, badges);
+  const chat = (i, text, badges = {}, tags) => page.evaluate((login, display, text, badges, tags) => FishTank.handleChat({ login, display, text, badges, tags }), 'v' + i, NAMES[i], text, badges, tags);
 
   const webm = OUT.replace(/\.mp4$/, '.webm');
   const rec = await page.screencast({ path: webm });
@@ -45,11 +57,23 @@ const NAMES = ['小魚乾', '阿宅不睡覺', 'Momo_TW', '路過的貓', 'kiwi_
   for (const [i, t] of [[1, '!跳'], [6, '!轉'], [5, '!泡泡'], [2, '!跳'], [4, '!轉']]) { await chat(i, t); await sleep(600); }
   await sleep(2500);
 
-  await cap('!餵 撒飼料，大家搶著吃，吃越多長越大');
-  await chat(7, '!餵');
+  await cap('!餵 自己吃、!餵 @名字 請別人吃、!餵 大家 全場一起吃');
+  await chat(7, '!餵 大家');
   await sleep(600);
-  await chat(2, '!餵');
-  await sleep(5000);
+  await chat(2, '!餵 @v11');
+  await sleep(5500);
+
+  await cap('實況主上傳的限定魚種：觀眾打 !小雞 就變身');
+  for (const i of [0, 4, 10]) { await chat(i, '!小雞'); await sleep(500); }
+  await sleep(3000);
+
+  await cap('!頭像 加表情符號，或 !頭像 大頭貼，貼在自己的魚身上');
+  await chat(3, '!頭像 :)', {}, { emotes: '1:4-5' });
+  await sleep(500);
+  await chat(12, '!頭像 :)', {}, { emotes: '1:4-5' });
+  await sleep(500);
+  await chat(5, '!頭像 大頭貼');
+  await sleep(4000);
 
   await cap('!抱 @名字 游過去給對方抱抱');
   await chat(3, '!抱 @v8');

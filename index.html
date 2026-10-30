@@ -40,6 +40,14 @@
   .area { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
   .area label { margin-bottom: 6px; }
   .area input { width: 100%; }
+  .skins { display: grid; gap: 6px; margin: 8px 0; }
+  .skin { display: grid; grid-template-columns: 48px 1fr auto; gap: 8px; align-items: center; background: #071c2e; border-radius: 8px; padding: 6px 8px; }
+  .skin img { width: 48px; height: 36px; object-fit: contain; background: repeating-conic-gradient(#173a57 0 25%, #0f2c44 0 50%) 0 0 / 12px 12px; border-radius: 4px; }
+  .skin b { display: block; font-size: 14px; }
+  .skin small { color: var(--muted); font-size: 11px; word-break: break-all; }
+  .skin button { padding: 4px 8px; }
+  .skin-add { display: grid; grid-template-columns: 90px 1fr auto auto; gap: 6px; margin: 6px 0; }
+  .ghost-btn { font-weight: 700; padding: 8px 12px; border-radius: 8px; background: #1d5277; color: var(--text); cursor: pointer; margin: 0; }
   .rewards { display: grid; gap: 6px; margin: 8px 0; }
   .reward { display: grid; grid-template-columns: 1fr 140px auto; gap: 6px; align-items: center; background: #071c2e; border-radius: 8px; padding: 6px 8px; }
   .reward b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -95,7 +103,25 @@
     </section>
 
     <section>
-      <h2>3. 稀有魚種（鯨魚、獨角鯨、錦鯉）</h2>
+      <h2>3. 自訂魚種與頭像</h2>
+      <div class="lbl">本頻道限定魚種</div>
+      <em>上傳圖片（或貼圖片網址）並取個名字，觀眾打 <b>!名字</b> 就會變成這張圖游來游去。建議用<b>透明背景、魚頭朝右</b>的 PNG。</em>
+      <div class="skins" id="skins"></div>
+      <div class="skin-add">
+        <input type="text" id="skinName" placeholder="名字，例如 小雞" maxlength="12">
+        <input type="text" id="skinUrl" placeholder="圖片網址（https://…），或按右邊上傳">
+        <label class="ghost-btn">上傳<input type="file" id="skinFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label>
+        <button class="ghost" id="skinAdd">加入</button>
+      </div>
+      <div class="msg" id="skinMsg"></div>
+      <em>上傳的圖片存到你的 Google 雲端硬碟，要先接好第 5 步的試算表。觀眾不能自己貼圖片，避免不適合的圖出現在直播上。</em>
+      <div class="lbl" id="avatarLbl" style="margin-top:14px">觀眾頭像</div>
+      <em>觀眾打 <b>!頭像</b> 加一個表情符號，那個表情就會貼在他的魚身上（表情都經過 Twitch 審核）。打 <b>!頭像 關</b> 拿掉。</em>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="pfp" checked><div><span>也可以用 !頭像 大頭貼 放 Twitch 大頭貼</span><em>大頭貼網址透過 decapi.me（免登入的公開服務）查詢</em></div></label>
+    </section>
+
+    <section>
+      <h2>4. 稀有魚種（鯨魚、獨角鯨、錦鯉）</h2>
       <em style="margin-bottom:10px">一般觀眾打 !鯨魚 會被擋下來，要用下面的方式解鎖。解鎖會直接變身並出現全場橫幅。被揪團進來的實況主直接送一隻鯨魚。</em>
       <label class="check"><input type="checkbox" id="subs" checked><div><span>訂閱、續訂、被送訂閱就解鎖</span></div></label>
       <label><span>一次贊助幾個小奇點以上解鎖</span><input type="number" id="bits" min="0" value="100"><em>填 0 關掉。訊息裡寫魚種名稱（例如 Cheer100 鯨魚）就解鎖那一隻</em></label>
@@ -106,8 +132,8 @@
     </section>
 
     <section>
-      <h2>4. 換電腦也記得每隻魚（選用）</h2>
-      <em style="margin-bottom:10px">魚的外觀平常記在 OBS 裡。接上 Google 試算表後存在雲端，換電腦、重灌 OBS 都還在，也能直接在試算表改。</em>
+      <h2>5. 換電腦也記得每隻魚（選用）</h2>
+      <em style="margin-bottom:10px">魚的外觀平常記在 OBS 裡。接上 Google 試算表後存在雲端，換電腦、重灌 OBS 都還在，也能直接在試算表改。第 3 步上傳的自訂魚種圖片也會存到你的雲端硬碟。</em>
       <ol>
         <li>開一份新的 Google 試算表 → 擴充功能 → Apps Script</li>
         <li><button class="ghost" id="copyScript">複製程式碼</button> 整段貼上（取代原本內容）→ 儲存</li>
@@ -122,7 +148,7 @@
 
   <div class="right">
     <section>
-      <h2>5. 複製到 OBS</h2>
+      <h2>6. 複製到 OBS</h2>
       <div class="url"><input type="text" id="url" readonly><button id="copy">複製</button></div>
       <p style="color:var(--muted);margin:8px 0 0;font-size:13px">OBS → 來源 → ＋ → 瀏覽器 → 貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。改了上面任何設定都要重新複製。</p>
     </section>
@@ -138,7 +164,8 @@
         <tr><td>!鯨魚 !獨角鯨 !錦鯉</td><td>稀有魚種，解鎖過才能換（身上會發光，鯨魚會噴水）</td></tr>
         <tr><td>!顏色 紅</td><td>紅 橙 黃 綠 藍 青 紫 粉 白 黑 灰 金 彩虹，或 #66ccff</td></tr>
         <tr><td>!跳 !衝 !轉 !睡 !泡泡</td><td>跳出水面、衝刺、轉圈、沉到底睡覺、吐泡泡（河豚會膨脹）</td></tr>
-        <tr><td>!餵</td><td>撒飼料，所有魚都會搶，吃到會變大（最大 2 倍）</td></tr>
+        <tr><td>!餵 / !餵 @名字 / !餵 大家</td><td>撒飼料給自己 / 請別人吃 / 全場一起吃，吃到會變大（最大 2 倍）</td></tr>
+        <tr><td>!頭像 表情符號 / !頭像 大頭貼</td><td>把表情符號或 Twitch 大頭貼貼在魚身上（!頭像 關 拿掉）</td></tr>
         <tr><td>!抱 @名字 / !跟 @名字</td><td>游過去抱抱冒愛心 / 跟在對方後面游 30 秒</td></tr>
         <tr><td>!離開</td><td>游出畫面</td></tr>
         <tr><td>!fishhelp</td><td>畫面中間顯示指令說明</td></tr>
@@ -153,9 +180,9 @@
 <script>
   const C = FishCore;
   const $ = (id) => document.getElementById(id);
-  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store'];
+  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store', 'pfp'];
   const SAVE = 'fishtank.setup.v1';
-  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '' };
+  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [] };
 
   // 裝飾勾選
   for (const [id, name] of Object.entries(C.DECOS)) {
@@ -198,6 +225,8 @@
     if (+$('bits').value !== 100) p.set('bits', $('bits').value);
     const rw = C.stringifyRewards(state.rewards);
     if (rw) p.set('rw', rw);
+    if (!$('pfp').checked) p.set('pfp', '0');
+    for (const k of state.skins) p.append('skin', `${k.name}|${k.url}`);
     if ($('store').value.trim()) { p.set('store', $('store').value.trim()); p.set('skey', state.skey); }
     if (demo) { p.set('demo', '1'); p.delete('store'); p.delete('skey'); } // 預覽不寫進試算表
     return p.toString();
@@ -212,6 +241,7 @@
     for (const k of fields) s[k] = $(k).type === 'checkbox' ? $(k).checked : $(k).value;
     try { localStorage.setItem(SAVE, JSON.stringify(s)); } catch { /* 無痕模式 */ }
     renderRewards();
+    renderSkins();
     clearTimeout(timer);
     timer = setTimeout(() => { $('preview').src = 'tank.html?' + params(true); }, 500);
     listen();
@@ -261,6 +291,58 @@
       box.append(row);
     }
   }
+
+  // ───────── 自訂魚種 ─────────
+  function renderSkins() {
+    const box = $('skins');
+    box.innerHTML = '';
+    state.skins.forEach((k, i) => {
+      const row = document.createElement('div');
+      row.className = 'skin';
+      row.innerHTML = '<img alt=""><div><b></b><small></small></div><button class="ghost" title="移除">✕</button>';
+      row.querySelector('img').src = k.url;
+      row.querySelector('img').onerror = () => { row.querySelector('small').textContent = '⚠ 圖片打不開，檢查網址'; };
+      row.querySelector('b').textContent = '!' + k.name;
+      row.querySelector('small').textContent = k.url;
+      row.querySelector('button').addEventListener('click', () => { state.skins.splice(i, 1); refresh(); });
+      box.append(row);
+    });
+  }
+  const skinMsg = (text, cls = '') => { $('skinMsg').className = 'msg ' + cls; $('skinMsg').textContent = text; };
+  function addSkin(name, url) {
+    name = name.trim().replace(/^[!！]/, '');
+    if (!name) return skinMsg('先取個名字', 'bad');
+    if (/[\s|]/.test(name)) return skinMsg('名字不能有空白或「|」', 'bad');
+    if (C.findSpecies(name) || C.parseCommand('!' + name)) return skinMsg(`「${name}」跟內建的魚種或指令重複了，換一個名字`, 'bad');
+    if (state.skins.some((k) => k.name === name)) return skinMsg(`已經有「${name}」了`, 'bad');
+    if (!/^https:\/\//.test(url)) return skinMsg('圖片網址要是 https:// 開頭', 'bad');
+    state.skins.push({ name, url });
+    $('skinName').value = '';
+    $('skinUrl').value = '';
+    skinMsg(`加好了，觀眾打 !${name} 就能變身。記得重新複製 OBS 網址。`, 'ok');
+    refresh();
+  }
+  $('skinAdd').addEventListener('click', () => addSkin($('skinName').value, $('skinUrl').value.trim()));
+  $('skinFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const store = $('store').value.trim();
+    if (!/^https:\/\/script\.google\.com\//.test(store)) return skinMsg('上傳要先接好第 5 步的 Google 試算表；或直接貼圖片網址', 'bad');
+    if (file.size > 2 * 1024 * 1024) return skinMsg('圖片要小於 2 MB', 'bad');
+    skinMsg('上傳中…');
+    try {
+      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+      const r = await fetch(store, { method: 'POST', body: JSON.stringify({ key: state.skey, action: 'upload', name: file.name, mime: file.type, data }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error === '不認得的動作' ? '試算表的程式碼是舊版：重新複製程式碼、貼上，部署新版本' : j.error);
+      $('skinUrl').value = j.url;
+      if (!$('skinName').value.trim()) $('skinName').value = file.name.replace(/\.[^.]+$/, '').slice(0, 12);
+      addSkin($('skinName').value, j.url);
+    } catch (err) {
+      skinMsg('上傳失敗：' + (err.message === 'Failed to fetch' ? '連不上試算表，先按第 5 步的「測試連線」' : err.message), 'bad');
+    }
+  });
 
   // ───────── 試算表 ─────────
   let scriptSrc = '';

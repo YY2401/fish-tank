@@ -23,7 +23,7 @@ if (!H.chromePath()) {
     page.evaluate((login, text, extra) => FishTank.handleChat({ login, display: extra.display || login, text, badges: extra.badges || {}, tags: extra.tags }), login, text, extra);
   const fish = (page, login) => page.evaluate((l) => {
     const f = FishTank.fishes.get(l);
-    return f && { species: f.species, color: f.color, size: f.size, state: f.state, x: f.x, y: f.y, say: f.say, unlocked: f.unlocked, leaving: f.leaving, flee: f.flee };
+    return f && { species: f.species, color: f.color, size: f.size, state: f.state, x: f.x, y: f.y, say: f.say, unlocked: f.unlocked, leaving: f.leaving, flee: f.flee, avatar: f.avatar };
   }, login);
   const advance = (page, sec) => page.evaluate((s) => FishTank.advance(s), sec);
   const peek = (page) => page.evaluate(() => FishTank.peek());
@@ -236,5 +236,90 @@ if (!H.chromePath()) {
     assert.ok(saved, '要寫回試算表');
     assert.equal(saved.color, '#ff4a4a');
     assert.deepEqual(saved.unlocked, ['koi']);
+  });
+
+  test('餵食：!餵 只給自己、!餵 @名字 給那個人、!餵 大家 全場都能吃', async (t) => {
+    const page = await open(t);
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'bob', '!魚');
+    await advance(page, 3);
+
+    await chat(page, 'amy', '!餵');
+    assert.ok((await peek(page)).foodOwners.every((o) => o === 'amy'), '!餵 的飼料只屬於自己');
+    await advance(page, 30);
+    assert.ok((await fish(page, 'amy')).size > 1, 'amy 吃到自己的飼料');
+    assert.equal((await fish(page, 'bob')).size, 1, 'bob 不能吃 amy 自己的飼料');
+
+    await advance(page, 16); // 冷卻
+    await chat(page, 'amy', '!餵 @bob');
+    assert.ok((await peek(page)).foodOwners.every((o) => o === 'bob'));
+    await advance(page, 30);
+    assert.ok((await fish(page, 'bob')).size > 1, 'bob 吃到 amy 請的飼料');
+
+    await chat(page, 'bob', '!餵 大家');
+    assert.ok((await peek(page)).foodOwners.every((o) => o === '*'));
+    await chat(page, 'carl', '!魚');
+    await advance(page, 16);
+    await chat(page, 'carl', '!餵 @nobody');
+    assert.match((await fish(page, 'carl')).say, /找不到/);
+  });
+
+  test('頭像：!頭像 表情符號、!頭像 大頭貼、!頭像 關，重新整理後還記得', async (t) => {
+    const routes = {
+      'https://static-cdn.jtvnw.net/': {},
+      'https://decapi.me/twitch/avatar/': { contentType: 'text/plain', body: 'https://static-cdn.jtvnw.net/jtv_user_pictures/amy-profile_image-300x300.png' },
+    };
+    const page = await open(t, '', { routes });
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!頭像 Kappa', { tags: { emotes: '25:4-8' } });
+    let f = await fish(page, 'amy');
+    assert.equal(f.avatar.kind, 'emote');
+    assert.equal(f.avatar.url, 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0');
+
+    await advance(page, 6);
+    await chat(page, 'amy', '!頭像 大頭貼');
+    await page.waitForFunction(() => FishTank.fishes.get('amy').avatar.kind === 'pfp');
+    f = await fish(page, 'amy');
+    assert.match(f.avatar.url, /amy-profile_image/);
+    await advance(page, 1);
+    assert.deepEqual(page.errors, []);
+
+    await H.sleep(800); // 寫進瀏覽器
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.FishTank);
+    await chat(page, 'amy', '我回來了');
+    assert.match((await fish(page, 'amy')).avatar.url, /amy-profile_image/);
+
+    await chat(page, 'amy', '!頭像 關');
+    assert.equal((await fish(page, 'amy')).avatar, null);
+    await chat(page, 'amy', '!頭像 http://evil.example/x.png');
+    assert.equal((await fish(page, 'amy')).avatar, null, '不能貼任意圖片網址');
+  });
+
+  test('頭像：實況主關掉大頭貼時會提示改用表情符號', async (t) => {
+    const page = await open(t, '&pfp=0', { routes: { 'https://decapi.me/': { contentType: 'text/plain', body: 'https://static-cdn.jtvnw.net/x.png' } } });
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!頭像 大頭貼');
+    assert.match((await fish(page, 'amy')).say, /沒有開放大頭貼/);
+    assert.equal(page.requested, undefined, '關掉時不要去查大頭貼');
+  });
+
+  test('自訂魚種：!名字 或 !變 名字 變成實況主上傳的圖，說明卡也看得到', async (t) => {
+    const skin = encodeURIComponent('小雞|https://img.example.com/chick.png');
+    const page = await open(t, `&skin=${skin}`, { routes: { 'https://img.example.com/': {} } });
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!小雞');
+    assert.equal((await fish(page, 'amy')).species, 'c:小雞');
+    await chat(page, 'bob', '!魚');
+    await chat(page, 'bob', '!變 小雞');
+    assert.equal((await fish(page, 'bob')).species, 'c:小雞');
+    await advance(page, 3);
+    await H.sleep(500); // 圖片是非同步載入
+    assert.ok((page.requested || []).some((u) => u.includes('chick.png')), '要載入自訂魚種的圖');
+    assert.ok(await page.evaluate(() => [...document.images].length === 0), '圖只畫在 Canvas 上');
+    assert.match(await page.$eval('#help dl', (e) => e.textContent), /!小雞/);
+    await chat(page, 'carl', '!變 不存在');
+    assert.match((await fish(page, 'carl')).say, /小雞/, '可以變的清單要列出自訂魚種');
+    assert.deepEqual(page.errors, []);
   });
 }

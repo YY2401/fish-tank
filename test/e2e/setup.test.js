@@ -99,4 +99,56 @@ if (!H.chromePath()) {
     await page.click('#testStore');
     assert.match(await page.$eval('#storeMsg', (e) => e.textContent), /script\.google\.com/);
   });
+
+  test('自訂魚種：貼圖片網址加入，名字重複或跟內建魚種撞名會擋；大頭貼開關寫進網址', async (t) => {
+    const page = await open(t, { routes: { 'https://img.example.com/': {} } });
+    await typeInto(page, '#skinName', '小雞');
+    await typeInto(page, '#skinUrl', 'https://img.example.com/chick.png');
+    await page.click('#skinAdd');
+    assert.deepEqual((await obsUrl(page)).getAll('skin'), ['小雞|https://img.example.com/chick.png']);
+    assert.equal(await page.$$eval('#skins .skin', (r) => r.length), 1);
+
+    await typeInto(page, '#skinName', '小雞');
+    await typeInto(page, '#skinUrl', 'https://img.example.com/b.png');
+    await page.click('#skinAdd');
+    assert.match(await page.$eval('#skinMsg', (e) => e.textContent), /已經有/);
+    await typeInto(page, '#skinName', '鯊魚');
+    await page.click('#skinAdd');
+    assert.match(await page.$eval('#skinMsg', (e) => e.textContent), /重複/);
+    await typeInto(page, '#skinName', '小狗');
+    await typeInto(page, '#skinUrl', 'http://img.example.com/dog.png');
+    await page.click('#skinAdd');
+    assert.match(await page.$eval('#skinMsg', (e) => e.textContent), /https/);
+
+    await page.click('#pfp');
+    assert.equal((await obsUrl(page)).get('pfp'), '0');
+    await page.click('#skins .skin button'); // 移除
+    assert.deepEqual((await obsUrl(page)).getAll('skin'), []);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('自訂魚種：上傳圖片要先接試算表；接好後存到雲端硬碟並自動加入', async (t) => {
+    const uploads = [];
+    const sheet = (body) => {
+      if (body.action === 'upload') { uploads.push(body); return { ok: true, url: 'https://lh3.googleusercontent.com/d/abc123' }; }
+      return { ok: true, profiles: {} };
+    };
+    const page = await open(t, { sheet, routes: { 'https://lh3.googleusercontent.com/': {} } });
+    const file = require('node:path').join(require('node:os').tmpdir(), 'fishtank-chick.png');
+    require('node:fs').writeFileSync(file, H.PNG);
+
+    const input = await page.$('#skinFile');
+    await input.uploadFile(file);
+    await page.waitForFunction(() => /試算表/.test(document.getElementById('skinMsg').textContent));
+    assert.equal(uploads.length, 0, '沒接試算表時不能上傳');
+
+    await typeInto(page, '#store', 'https://script.google.com/macros/s/TEST/exec');
+    await typeInto(page, '#skinName', '小雞');
+    await input.uploadFile(file);
+    await page.waitForFunction(() => /加好了/.test(document.getElementById('skinMsg').textContent));
+    assert.equal(uploads.length, 1);
+    assert.equal(uploads[0].mime, 'image/png');
+    assert.equal(Buffer.from(uploads[0].data, 'base64').length, H.PNG.length, '圖片內容完整上傳');
+    assert.deepEqual((await obsUrl(page)).getAll('skin'), ['小雞|https://lh3.googleusercontent.com/d/abc123']);
+  });
 }

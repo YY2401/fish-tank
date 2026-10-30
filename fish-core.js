@@ -50,6 +50,7 @@
     feed: ['feed', '餵', '餵食', '飼料'],
     follow: ['follow', '跟', '跟隨'],
     hug: ['hug', '抱', '抱抱', 'kiss', '親'],
+    avatar: ['avatar', '頭像', '臉', 'face'],
     help: ['fishhelp', '魚說明', '水族箱'],
     tank: ['tank'], // 實況主／管理員專用：!tank clear、!tank feed、!tank shark…
   };
@@ -101,17 +102,53 @@
     return COLORS[w] || null;
   }
 
+  const EVERYONE = ['大家', '全部', '所有人', 'all', 'everyone'];
+
   // 「!指令 參數」→ { cmd, arg, target }；不是指令回傳 null
-  function parseCommand(text) {
+  // skins：實況主自訂的魚種（直接打 !名字 也能變身）
+  // target：!抱／!跟 的對象；!餵 的對象（null = 只給自己，'*' = 給大家）
+  function parseCommand(text, skins = []) {
     const m = String(text || '').trim().match(/^[!！]\s*(\S+)\s*(.*)$/);
     if (!m) return null;
     let cmd = ALIAS[m[1].toLowerCase()];
+    const custom = !cmd && skins.find((k) => k.name.toLowerCase() === m[1].toLowerCase());
+    if (custom) cmd = 'skin:' + custom.id;
     if (!cmd) return null;
     let arg = m[2].trim();
     if (cmd.startsWith('skin:')) { arg = cmd.slice(5); cmd = 'skin'; }
     const at = arg.match(/^@?([A-Za-z0-9_]{2,25})\b/);
-    const target = (cmd === 'follow' || cmd === 'hug') && at ? at[1].toLowerCase() : null;
+    let target = (cmd === 'follow' || cmd === 'hug' || cmd === 'feed') && at ? at[1].toLowerCase() : null;
+    if (cmd === 'feed' && EVERYONE.includes(arg.toLowerCase())) target = '*';
     return { cmd, arg, target };
+  }
+
+  // 訊息裡第一個 Twitch 表情符號的 ID（IRC 標籤 emotes=25:0-4,12-16/1902:6-10）
+  function firstEmote(tags) {
+    let best = null;
+    for (const part of String((tags && tags.emotes) || '').split('/')) {
+      const [id, ranges] = part.split(':');
+      if (!id || !ranges) continue;
+      for (const r of ranges.split(',')) {
+        const start = parseInt(r, 10);
+        if (Number.isFinite(start) && (!best || start < best.start)) best = { id, start };
+      }
+    }
+    return best && best.id;
+  }
+  const emoteUrl = (id) => `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(id)}/default/dark/2.0`;
+
+  // 實況主自訂魚種：網址參數 skin=名字|圖片網址（可以有好幾個）
+  function parseSkins(list) {
+    const out = [];
+    for (const raw of list || []) {
+      const i = String(raw).indexOf('|');
+      if (i < 1) continue;
+      const name = raw.slice(0, i).trim().replace(/^[!！]/, '').slice(0, 12);
+      const url = raw.slice(i + 1).trim();
+      if (!name || !/^https:\/\//.test(url) || out.some((k) => k.name === name)) continue;
+      out.push({ id: 'c:' + name, name, url });
+    }
+    return out;
   }
 
   // 冷卻檢查：可以執行就記下時間並回傳 true
@@ -217,6 +254,7 @@
     deco: 'chest,coral,bubbler', // 魚缸裝飾
     store: '', // Google 試算表（Apps Script 網頁應用程式）網址，換電腦也記得每隻魚
     skey: '', // 試算表暗號
+    pfp: true, // 觀眾可以用 !頭像 大頭貼 把 Twitch 大頭貼放到魚身上
   };
   function readOptions(search) {
     const p = new URLSearchParams(search || '');
@@ -244,6 +282,8 @@
       deco: (p.get('deco') ?? DEFAULTS.deco).split(',').map((s) => s.trim()).filter((d) => DECOS[d]),
       store: /^https:\/\/script\.google(usercontent)?\.com\//.test(p.get('store') || '') ? p.get('store') : '',
       skey: p.get('skey') || '',
+      skins: parseSkins(p.getAll('skin')),
+      pfp: bool('pfp'),
     };
   }
 
@@ -258,5 +298,5 @@
     return common[hashStr(login) % common.length];
   }
 
-  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
+  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
 });

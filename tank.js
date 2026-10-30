@@ -23,6 +23,7 @@
   const parts = []; // 粒子：泡泡、水花、愛心、zzz
   const cool = {};
   let now = performance.now();
+  const SKIN = Object.fromEntries(opt.skins.map((k) => [k.id, { name: k.name, url: k.url, color: '#ffffff', scale: 1.15, speed: 50, custom: true }]));
   let frameDt = 0.016;
 
   // ───────── 觀眾外觀：瀏覽器先記一份，有設定試算表就同步到雲端 ─────────
@@ -32,16 +33,17 @@
   let saveTimer = 0;
   const dirty = new Set(); // 還沒寫進試算表的帳號
   function saveProfile(f) {
-    profiles[f.login] = { display: f.display, species: f.species, color: f.color, size: +f.size.toFixed(2), unlocked: f.unlocked.slice() };
+    profiles[f.login] = { display: f.display, species: f.species, color: f.color, size: +f.size.toFixed(2), unlocked: f.unlocked.slice(), avatar: f.avatar };
     dirty.add(f.login);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(profiles)); } catch { /* 無痕或封鎖儲存：只是不記外觀 */ } }, 500);
   }
   function applyProfile(f, p) {
-    if (C.SPECIES[p.species]) f.species = p.species;
+    if (C.SPECIES[p.species] || SKIN[p.species]) f.species = p.species;
     f.color = p.color || null;
     f.size = clamp(+p.size || 1, 0.6, 2);
     f.unlocked = Array.isArray(p.unlocked) ? p.unlocked.filter((id) => C.SPECIES[id]) : [];
+    f.avatar = p.avatar && /^https:\/\//.test(p.avatar.url || '') ? { kind: p.avatar.kind, url: p.avatar.url } : null;
   }
 
   async function cloudCall(body) {
@@ -352,21 +354,47 @@
   }
   function colorOf(f) {
     if (f.color === 'rainbow') return hslHex((now / 20 + f.hue) % 360, 85, 60);
-    return f.color || C.SPECIES[f.species].color;
+    return f.color || spec(f.species).color;
+  }
+
+  // 魚種資料：內建魚種，或實況主在設定頁加的自訂魚種（一張圖）
+  function spec(id) { return C.SPECIES[id] || SKIN[id] || C.SPECIES.goldfish; }
+  // 「鯊魚」「shark」「小雞」（自訂）→ 魚種 ID
+  function findSkin(word) {
+    const w = String(word || '').trim().toLowerCase();
+    const k = opt.skins.find((s) => s.id.toLowerCase() === w || s.name.toLowerCase() === w);
+    return k ? k.id : C.findSpecies(word);
+  }
+
+  // 圖片（自訂魚種、表情符號、大頭貼）載入一次就留著；還沒載好時先不畫
+  const images = new Map();
+  function image(url) {
+    let im = images.get(url);
+    if (!im) {
+      im = new Image();
+      im.src = url;
+      images.set(url, im);
+    }
+    return im.complete && im.naturalWidth ? im : null;
   }
 
   // ───────── 魚 ─────────
-  function bodyLen(f) { return 44 * S * opt.scale * C.SPECIES[f.species].scale * f.size; }
+  function bodyLen(f) { return 44 * S * opt.scale * spec(f.species).scale * f.size; }
   // 魚身往上、往下各佔幾倍身長（放名字和泡泡用）
   const TOP = { goldfish: 0.36, clown: 0.32, puffer: 0.32, angel: 0.72, shark: 0.36, jelly: 0.38, whale: 0.24, narwhal: 0.22, koi: 0.24 };
   const BOTTOM = { goldfish: 0.28, clown: 0.26, puffer: 0.3, angel: 0.72, shark: 0.28, jelly: 0.72, whale: 0.22, narwhal: 0.18, koi: 0.2 };
   function extent(f, table) {
-    const v = table[f.species] * bodyLen(f);
+    let k = table[f.species];
+    if (k === undefined) { // 自訂魚種：看圖片的長寬比
+      const im = image(spec(f.species).url);
+      k = im ? (im.naturalHeight / im.naturalWidth) * 0.5 : 0.35;
+    }
+    const v = k * bodyLen(f);
     return f.species === 'puffer' ? v * (1 + f.puff * 0.55) : v;
   }
 
   function canUse(f, id) {
-    return !C.SPECIES[id].rare || f.unlocked.includes(id) || f.badges.broadcaster;
+    return !spec(id).rare || f.unlocked.includes(id) || f.badges.broadcaster;
   }
 
   function spawn(msg) {
@@ -378,7 +406,7 @@
       display: msg.display || msg.login,
       badges: msg.badges || {},
       species: C.defaultSpecies(msg.login),
-      color: null, size: 1, unlocked: [],
+      color: null, size: 1, unlocked: [], avatar: null,
       hue: C.hashStr(msg.login) % 360,
       x: rx(0.1, 0.9),
       y: surfaceY - 30 * S,
@@ -477,7 +505,7 @@
       return;
     }
 
-    const cmd = C.parseCommand(msg.text);
+    const cmd = C.parseCommand(msg.text, opt.skins);
     if (cmd && cmd.cmd === 'tank') {
       if (badges.broadcaster || badges.mod) tankCommand(cmd.arg);
       return;
@@ -515,9 +543,9 @@
         speak(f, '掰掰～');
         break;
       case 'skin': {
-        const id = C.findSpecies(cmd.arg);
-        if (!id) { speak(f, '可以變：' + C.SPECIES_IDS.filter((k) => !C.SPECIES[k].rare).map((k) => C.SPECIES[k].name).join('、')); break; }
-        if (!canUse(f, id)) { speak(f, `${C.SPECIES[id].name}是稀有魚種，${rareHint()}`, 8, 60); break; }
+        const id = findSkin(cmd.arg);
+        if (!id) { speak(f, '可以變：' + skinNames().join('、'), 6, 60); break; }
+        if (!canUse(f, id)) { speak(f, `${spec(id).name}是稀有魚種，${rareHint()}`, 8, 60); break; }
         f.species = id;
         poof(f);
         saveProfile(f);
@@ -552,9 +580,22 @@
         if (f.species === 'whale' || f.species === 'narwhal') f.spout = 0;
         for (let i = 0; i < 8; i++) bubble(f.x + f.dir * bodyLen(f) * 0.45, f.y, rand(2, 6) * S, i * 0.08);
         break;
-      case 'feed':
+      case 'feed': {
+        // !餵 只給自己、!餵 @名字 給那個人、!餵 大家 全場都能吃
         wake();
-        dropFood(f.x + rand(-80, 80) * S, 6);
+        if (cmd.target === '*') {
+          for (let i = 0; i < 3; i++) dropFood(rx(0.15, 0.85), 4, null);
+          speak(f, '請大家吃！');
+          break;
+        }
+        const to = cmd.target ? fishes.get(cmd.target) : f;
+        if (!to || to.leaving) { speak(f, `找不到 @${cmd.target} 的魚`); break; }
+        dropFood(to.x, 5, to.login);
+        if (to !== f) { speak(f, `請 ${to.display} 吃飼料`); hearts(to.x, to.y - bodyLen(to) * 0.4, 2); }
+        break;
+      }
+      case 'avatar':
+        setAvatar(f, cmd.arg, tags);
         break;
       case 'follow':
       case 'hug': {
@@ -565,6 +606,45 @@
         f.other = other.login;
         break;
       }
+    }
+  }
+
+  function skinNames() {
+    return [...C.SPECIES_IDS.filter((k) => !C.SPECIES[k].rare).map((k) => C.SPECIES[k].name), ...opt.skins.map((k) => k.name)];
+  }
+
+  // !頭像 表情符號 → 那個表情放到魚身上；!頭像 大頭貼 → Twitch 大頭貼；!頭像 關 → 拿掉
+  // 不讓觀眾貼任意圖片網址：直播畫面上的圖要經過 Twitch（表情、大頭貼）或實況主（自訂魚種）把關
+  function setAvatar(f, arg, tags) {
+    const a = String(arg || '').trim().toLowerCase();
+    const emote = C.firstEmote(tags);
+    if (emote) {
+      f.avatar = { kind: 'emote', url: C.emoteUrl(emote) };
+      poof(f);
+      saveProfile(f);
+    } else if (['關', '關掉', '取消', 'off', 'none', '拿掉'].includes(a)) {
+      f.avatar = null;
+      saveProfile(f);
+    } else if (['大頭貼', '頭貼', 'pfp', '大頭照'].includes(a)) {
+      if (!opt.pfp) { speak(f, '這個頻道沒有開放大頭貼，改用 !頭像 加表情符號', 6, 40); return; }
+      fetchPfp(f.login).then((url) => {
+        if (!url) { speak(f, '抓不到大頭貼，等一下再試'); return; }
+        f.avatar = { kind: 'pfp', url };
+        poof(f);
+        saveProfile(f);
+      });
+    } else {
+      speak(f, '!頭像 加一個表情符號，或 !頭像 大頭貼' + (opt.pfp ? '' : '（本頻道沒開）'), 6, 40);
+    }
+  }
+  // Twitch 大頭貼網址（decapi.me 是不用登入的公開服務）；只接受 Twitch 自己的圖片網址
+  async function fetchPfp(login) {
+    try {
+      const r = await fetch('https://decapi.me/twitch/avatar/' + encodeURIComponent(login));
+      const url = (await r.text()).trim();
+      return /^https:\/\/static-cdn\.jtvnw\.net\//.test(url) ? url : null;
+    } catch {
+      return null;
     }
   }
 
@@ -580,7 +660,7 @@
   function tankCommand(arg) {
     const a = arg.trim().toLowerCase();
     if (a === 'clear' || a === '清空') for (const f of fishes.values()) f.leaving = true;
-    else if (a === 'feed' || a === '餵') for (let i = 0; i < 6; i++) dropFood(rx(0.1, 0.9), 5);
+    else if (a === 'feed' || a === '餵') for (let i = 0; i < 6; i++) dropFood(rx(0.1, 0.9), 5, null);
     else if (a === 'help' || a === '說明') showHelp();
     else if (a === 'shark' || a === '鯊魚') startEvent('shark');
     else if (a === 'whirl' || a === '漩渦') startEvent('whirl');
@@ -712,8 +792,9 @@
       parts.push({ k: 'spark', x: f.x, y: f.y, vx: Math.cos(a) * 110 * S, vy: Math.sin(a) * 110 * S, r: 3 * S, life: 0, max: 0.6, color: colorOf(f) });
     }
   }
-  function dropFood(x, n) {
-    for (let i = 0; i < n; i++) food.push({ x: clamp(x + rand(-40, 40) * S, X0 + 20 * S, X1 - 20 * S), y: surfaceY + rand(-10, 10) * S, ph: rand(0, TAU), life: 0 });
+  // owner：只有這隻魚能吃（null = 大家都能吃）
+  function dropFood(x, n, owner) {
+    for (let i = 0; i < n; i++) food.push({ x: clamp(x + rand(-40, 40) * S, X0 + 20 * S, X1 - 20 * S), y: surfaceY + rand(-10, 10) * S, ph: rand(0, TAU), life: 0, owner });
   }
 
   // ───────── 模擬 ─────────
@@ -774,9 +855,11 @@
     }
   }
 
+  // 只找自己能吃的飼料（給大家的，或指定給自己的）
   function nearestFood(f) {
     let best = null, bd = Infinity;
     for (const p of food) {
+      if (p.owner && p.owner !== f.login) continue;
       const d = (p.x - f.x) ** 2 + (p.y - f.y) ** 2;
       if (d < bd) { bd = d; best = p; }
     }
@@ -784,7 +867,7 @@
   }
 
   function updateFish(f, dt, t) {
-    const sp = C.SPECIES[f.species];
+    const sp = spec(f.species);
     const L = bodyLen(f);
     const base = sp.speed * S * (0.9 + f.size * 0.1);
     const idleMs = opt.idle * 60000;
@@ -1150,7 +1233,7 @@
     ctx.globalAlpha = f.alpha;
     ctx.translate(f.x, f.y);
     // 稀有魚種有一圈淡淡的光
-    if (C.SPECIES[f.species].rare) {
+    if (spec(f.species).rare) {
       const g = ctx.createRadialGradient(0, 0, L * 0.1, 0, 0, L * 0.7);
       g.addColorStop(0, `rgba(255,236,150,${0.22 + Math.sin(t * 3 + f.hue) * 0.06})`);
       g.addColorStop(1, 'rgba(255,236,150,0)');
@@ -1166,7 +1249,43 @@
       ctx.scale(f.face, 1);
       ctx.rotate(f.pitch + f.spin);
       const sw = Math.sin(f.tail) * L * 0.09;
-      ({ goldfish: drawGoldfish, clown: drawClown, puffer: drawPuffer, angel: drawAngel, shark: drawShark, whale: drawWhale, narwhal: drawNarwhal, koi: drawKoi })[f.species](L, c, sw, f);
+      if (spec(f.species).custom) drawSkinImage(L, f);
+      else ({ goldfish: drawGoldfish, clown: drawClown, puffer: drawPuffer, angel: drawAngel, shark: drawShark, whale: drawWhale, narwhal: drawNarwhal, koi: drawKoi })[f.species](L, c, sw, f);
+    }
+    ctx.restore();
+    if (f.avatar) drawAvatar(f, L);
+  }
+
+  // 自訂魚種：實況主上傳的圖（魚頭朝右），跟著尾巴節奏輕輕擺動、伸縮
+  function drawSkinImage(L, f) {
+    const im = image(spec(f.species).url);
+    if (!im) return;
+    const h = L * (im.naturalHeight / im.naturalWidth);
+    ctx.rotate(Math.sin(f.tail) * 0.06);
+    ctx.scale(1 + Math.sin(f.tail * 2) * 0.03, 1);
+    ctx.drawImage(im, -L / 2, -h / 2, L, h);
+  }
+
+  // 頭像（表情符號或大頭貼）：圓形貼在魚身上，不跟著左右翻轉（字才不會反過來）
+  function drawAvatar(f, L) {
+    const im = image(f.avatar.url);
+    if (!im) return;
+    const r = clamp(Math.min(extent(f, TOP), extent(f, BOTTOM)) * 0.85, 8 * S, 40 * S);
+    const x = f.x, y = f.species === 'jelly' ? f.y - L * 0.14 : f.y;
+    ctx.save();
+    ctx.globalAlpha = f.alpha;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x, y, r + 2 * S, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.clip();
+    if (f.avatar.kind === 'pfp') ctx.drawImage(im, x - r, y - r, r * 2, r * 2);
+    else { // 表情符號是透明底，墊一層淡色
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      ctx.drawImage(im, x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7);
     }
     ctx.restore();
   }
@@ -1674,10 +1793,21 @@
     '<b>!鯊魚</b> <b>!河豚</b> <b>!水母</b> <b>!小丑魚</b> 換魚種',
     '<b>!顏色 粉</b>、<b>!顏色 彩虹</b>、<b>!顏色 #66ccff</b> 換顏色',
     '<b>!跳</b> <b>!衝</b> <b>!轉</b> <b>!睡</b> <b>!泡泡</b> 做動作',
-    '<b>!餵</b> 撒飼料，魚吃越多長越大',
+    '<b>!餵</b> 自己吃、<b>!餵 @名字</b> 請別人吃、<b>!餵 大家</b> 全場吃',
+    '<b>!頭像</b> 加一個表情符號，把它放到魚身上' + (opt.pfp ? '；<b>!頭像 大頭貼</b> 用 Twitch 大頭貼' : ''),
     '<b>!抱 @名字</b> 抱抱、<b>!跟 @名字</b> 跟著游',
     `稀有魚種 <b>鯨魚</b> <b>獨角鯨</b> <b>錦鯉</b>：${rareHint()}`,
   ];
+  if (opt.skins.length) {
+    const names = opt.skins.map((k) => '!' + k.name);
+    TIPS.splice(2, 0, '本頻道限定魚種：' + names.map((n) => `<b>${n.replace(/</g, '&lt;')}</b>`).join(' '));
+    const dt = document.createElement('dt');
+    dt.textContent = names.join(' ');
+    const dd = document.createElement('dd');
+    dd.textContent = '本頻道限定魚種';
+    document.querySelector('#help dl').insertBefore(dd, document.querySelector('#help dl dt:nth-of-type(3)'));
+    document.querySelector('#help dl').insertBefore(dt, dd);
+  }
   const tipEl = document.getElementById('tip');
   if (opt.tip) {
     let i = 0;
@@ -1785,6 +1915,6 @@
       for (let i = 0; i < sec * 60; i++) { skew += 1000 / 60; now = performance.now() + skew; update(1 / 60); }
       draw();
     },
-    peek: () => ({ ev: ev && ev.type, food: food.length, schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
+    peek: () => ({ ev: ev && ev.type, food: food.length, foodOwners: food.map((p) => p.owner || '*'), schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
   };
 })();
