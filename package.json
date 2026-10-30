@@ -1,0 +1,10 @@
+{
+  "name": "fish-tank",
+  "version": "0.2.0",
+  "private": true,
+  "description": "直播互動水族箱：Twitch 觀眾在聊天室打指令變成魚（純靜態，OBS 瀏覽器來源）",
+  "scripts": {
+    "start": "python -m http.server 3010",
+    "test": "node --test test/core.test.js test/sheet-script.test.js"
+  }
+}

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>直播水族箱設定</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #062238; --card: #0c3352; --line: #1d5277; --text: #e6f6ff; --muted: #8fb6d1; --accent: #ffd84a; --btn: #ff8a2a; --ok: #5fe08c; --bad: #ff7a7a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Noto Sans TC", system-ui, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+  h1 { grid-column: 1 / -1; margin: 0; font-weight: 900; font-size: 26px; }
+  h1 small { display: block; font-size: 14px; font-weight: 500; color: var(--muted); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .left { display: grid; gap: 20px; align-content: start; }
+  .right { display: grid; gap: 20px; align-content: start; }
+  h2 { margin: 0 0 10px; font-size: 16px; }
+  label { display: block; margin-bottom: 12px; }
+  label > span, .lbl { display: block; font-weight: 700; margin-bottom: 4px; }
+  em { display: block; font-style: normal; color: var(--muted); font-size: 13px; }
+  input[type=text], input[type=number], select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #071c2e; color: var(--text); font: inherit; }
+  .check { display: flex; gap: 8px; align-items: flex-start; }
+  .check input { margin-top: 5px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 12px; }
+  .checks label { margin: 0; display: flex; gap: 6px; align-items: center; }
+  .url { display: flex; gap: 6px; }
+  .url input { flex: 1; font-size: 12px; }
+  button { font: inherit; font-weight: 700; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--btn); color: #1b1200; cursor: pointer; }
+  button.ghost { background: #1d5277; color: var(--text); }
+  .preview { aspect-ratio: 16 / 9; width: 100%; border: 0; border-radius: 10px; background: #000; display: block; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  td { border-top: 1px solid var(--line); padding: 6px 4px; vertical-align: top; }
+  td:first-child { color: var(--accent); font-weight: 700; padding-right: 12px; }
+  ol { margin: 0 0 10px; padding-left: 1.3em; }
+  ol li { margin-bottom: 6px; }
+  .rewards { display: grid; gap: 6px; margin: 8px 0; }
+  .reward { display: grid; grid-template-columns: 1fr 140px auto; gap: 6px; align-items: center; background: #071c2e; border-radius: 8px; padding: 6px 8px; }
+  .reward b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reward small { color: var(--muted); font-size: 11px; word-break: break-all; }
+  .reward button { padding: 4px 8px; }
+  .msg { font-size: 13px; margin-top: 6px; }
+  .msg.ok { color: var(--ok); }
+  .msg.bad { color: var(--bad); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
+  .dot.on { background: var(--ok); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>🐠 直播水族箱 <small>觀眾在聊天室打指令，就會變成魚在你的直播畫面裡游泳</small></h1>
+
+  <div class="left">
+    <section>
+      <h2>1. 基本設定</h2>
+      <label><span>Twitch 頻道名稱</span><input type="text" id="channel" placeholder="例如 yy2401"><em>網址 twitch.tv/ 後面那段，不用登入</em></label>
+      <label class="check"><input type="checkbox" id="auto" checked><div><span>講話就自動變成魚</span><em>關掉的話要打 !魚 才會加入</em></div></label>
+      <label class="check"><input type="checkbox" id="say" checked><div><span>魚頭上顯示聊天內容</span></div></label>
+      <label class="check"><input type="checkbox" id="tip" checked><div><span>左下角輪播指令提示</span></div></label>
+      <label><span>背景</span>
+        <select id="bg"><option value="tank">完整水族箱（全畫面場景）</option><option value="none">透明（疊在遊戲畫面上）</option></select>
+      </label>
+      <label><span>水面高度：<b id="topV"></b></span><input type="range" id="top" min="0" max="0.8" step="0.05" value="0"><em>透明模式想讓魚只在畫面下方游，就往右拉</em></label>
+      <label><span>魚的大小：<b id="scaleV"></b></span><input type="range" id="scale" min="0.5" max="2" step="0.1" value="1"></label>
+      <label><span>最多幾隻魚</span><input type="number" id="max" min="1" max="200" value="60"></label>
+      <label><span>幾分鐘沒講話就游走</span><input type="number" id="idle" min="1" max="240" value="20"></label>
+    </section>
+
+    <section>
+      <h2>2. 魚缸裝飾與大事件</h2>
+      <div class="lbl">裝飾（擺在魚缸底部）</div>
+      <div class="checks" id="decos"></div>
+      <label><span>每幾分鐘隨機來一次大事件</span><input type="number" id="event" min="0" max="240" value="15"><em>鯊魚出沒、大漩渦、寶箱掉落輪流來；填 0 關掉。實況主或管理員也可以打 !tank shark／whirl／treasure 手動叫</em></label>
+    </section>
+
+    <section>
+      <h2>3. 稀有魚種（鯨魚、獨角鯨、錦鯉）</h2>
+      <em style="margin-bottom:10px">一般觀眾打 !鯨魚 會被擋下來，要用下面的方式解鎖。解鎖會直接變身並出現全場橫幅。被揪團進來的實況主直接送一隻鯨魚。</em>
+      <label class="check"><input type="checkbox" id="subs" checked><div><span>訂閱、續訂、被送訂閱就解鎖</span></div></label>
+      <label><span>一次贊助幾個小奇點以上解鎖</span><input type="number" id="bits" min="0" value="100"><em>填 0 關掉。訊息裡寫魚種名稱（例如 Cheer100 鯨魚）就解鎖那一隻</em></label>
+      <div class="lbl">忠誠點品項</div>
+      <em>不用登入的限制：品項要勾「<b>需要觀眾輸入文字</b>」，水族箱才看得到兌換。<br>設好頻道後，自己或請觀眾<b>兌換一次</b>，品項就會出現在下面，選它要做什麼。</em>
+      <div class="msg"><span class="dot" id="listenDot"></span><span id="listenText">填頻道名稱後開始偵測</span></div>
+      <div class="rewards" id="rewards"></div>
+    </section>
+
+    <section>
+      <h2>4. 換電腦也記得每隻魚（選用）</h2>
+      <em style="margin-bottom:10px">魚的外觀平常記在 OBS 裡。接上 Google 試算表後存在雲端，換電腦、重灌 OBS 都還在，也能直接在試算表改。</em>
+      <ol>
+        <li>開一份新的 Google 試算表 → 擴充功能 → Apps Script</li>
+        <li><button class="ghost" id="copyScript">複製程式碼</button> 整段貼上（取代原本內容）→ 儲存</li>
+        <li>部署 → 新增部署作業 → 類型「網頁應用程式」，執行身分「我」、存取權「所有人」→ 部署（第一次會要求授權）</li>
+        <li>把網頁應用程式網址貼到這裡：</li>
+      </ol>
+      <div class="url"><input type="text" id="store" placeholder="https://script.google.com/macros/s/…/exec"><button class="ghost" id="testStore">測試連線</button></div>
+      <div class="msg" id="storeMsg"></div>
+      <em style="margin-top:8px">程式碼裡有一組只屬於你的暗號，OBS 網址也會帶著它。<a href="#" id="newKey" style="color:var(--muted)">換一組暗號</a>（換了要重新複製程式碼、重新部署）</em>
+    </section>
+  </div>
+
+  <div class="right">
+    <section>
+      <h2>5. 複製到 OBS</h2>
+      <div class="url"><input type="text" id="url" readonly><button id="copy">複製</button></div>
+      <p style="color:var(--muted);margin:8px 0 0;font-size:13px">OBS → 來源 → ＋ → 瀏覽器 → 貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。改了上面任何設定都要重新複製。</p>
+    </section>
+    <section>
+      <h2>預覽（右下角可以模擬聊天室打指令、訂閱、大事件）</h2>
+      <iframe id="preview" class="preview" title="水族箱預覽"></iframe>
+    </section>
+    <section>
+      <h2>觀眾指令</h2>
+      <table>
+        <tr><td>!魚</td><td>變成一隻魚加入（同一個人每次進來外觀都一樣）</td></tr>
+        <tr><td>!鯊魚 !河豚 !水母 !金魚 !小丑魚 !神仙魚</td><td>換魚種（也可以打 !變 鯊魚）</td></tr>
+        <tr><td>!鯨魚 !獨角鯨 !錦鯉</td><td>稀有魚種，解鎖過才能換（身上會發光，鯨魚會噴水）</td></tr>
+        <tr><td>!顏色 紅</td><td>紅 橙 黃 綠 藍 青 紫 粉 白 黑 灰 金 彩虹，或 #66ccff</td></tr>
+        <tr><td>!跳 !衝 !轉 !睡 !泡泡</td><td>跳出水面、衝刺、轉圈、沉到底睡覺、吐泡泡（河豚會膨脹）</td></tr>
+        <tr><td>!餵</td><td>撒飼料，所有魚都會搶，吃到會變大（最大 2 倍）</td></tr>
+        <tr><td>!抱 @名字 / !跟 @名字</td><td>游過去抱抱冒愛心 / 跟在對方後面游 30 秒</td></tr>
+        <tr><td>!離開</td><td>游出畫面</td></tr>
+        <tr><td>!fishhelp</td><td>畫面中間顯示指令說明</td></tr>
+        <tr><td>!tank shark / whirl / treasure</td><td>（實況主、管理員）鯊魚出沒 / 大漩渦 / 寶箱掉落</td></tr>
+        <tr><td>!tank feed / clear</td><td>（實況主、管理員）全場撒飼料 / 清空魚缸</td></tr>
+      </table>
+    </section>
+  </div>
+</main>
+<script src="fish-core.js"></script>
+<script src="chat.js"></script>
+<script>
+  const C = FishCore;
+  const $ = (id) => document.getElementById(id);
+  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store'];
+  const SAVE = 'fishtank.setup.v1';
+  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '' };
+
+  // 裝飾勾選
+  for (const [id, name] of Object.entries(C.DECOS)) {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox" value="${id}"> ${name}`;
+    $('decos').append(l);
+  }
+
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE)) || {};
+    for (const k of fields) if (k in s) $(k).type === 'checkbox' ? ($(k).checked = s[k]) : ($(k).value = s[k]);
+    state = { ...state, ...(s.state || {}) };
+  } catch { /* 沒存過 */ }
+  if (!state.skey) state.skey = newKey();
+  for (const c of $('decos').querySelectorAll('input')) c.checked = state.decos.includes(c.value);
+
+  function newKey() {
+    const a = new Uint8Array(12);
+    crypto.getRandomValues(a);
+    return [...a].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 16);
+  }
+  function channel() {
+    return $('channel').value.trim().replace(/^.*twitch\.tv\//, '').replace(/[^A-Za-z0-9_]/g, '').toLowerCase();
+  }
+
+  function params(demo) {
+    const p = new URLSearchParams();
+    if (channel()) p.set('channel', channel());
+    if (!$('auto').checked) p.set('auto', '0');
+    if (!$('say').checked) p.set('say', '0');
+    if (!$('tip').checked) p.set('tip', '0');
+    if ($('bg').value !== 'tank') p.set('bg', 'none');
+    if (+$('top').value) p.set('top', $('top').value);
+    if (+$('scale').value !== 1) p.set('scale', $('scale').value);
+    if (+$('max').value !== 60) p.set('max', $('max').value);
+    if (+$('idle').value !== 20) p.set('idle', $('idle').value);
+    if (+$('event').value !== 15) p.set('event', $('event').value);
+    if (state.decos.join(',') !== C.DEFAULTS.deco) p.set('deco', state.decos.join(','));
+    if (!$('subs').checked) p.set('subs', '0');
+    if (+$('bits').value !== 100) p.set('bits', $('bits').value);
+    const rw = C.stringifyRewards(state.rewards);
+    if (rw) p.set('rw', rw);
+    if ($('store').value.trim()) { p.set('store', $('store').value.trim()); p.set('skey', state.skey); }
+    if (demo) { p.set('demo', '1'); p.delete('store'); p.delete('skey'); } // 預覽不寫進試算表
+    return p.toString();
+  }
+
+  let timer = 0;
+  function refresh() {
+    $('topV').textContent = Math.round($('top').value * 100) + '%';
+    $('scaleV').textContent = $('scale').value + ' 倍';
+    $('url').value = new URL('tank.html', location.href).href + '?' + params(false);
+    const s = { state };
+    for (const k of fields) s[k] = $(k).type === 'checkbox' ? $(k).checked : $(k).value;
+    try { localStorage.setItem(SAVE, JSON.stringify(s)); } catch { /* 無痕模式 */ }
+    renderRewards();
+    clearTimeout(timer);
+    timer = setTimeout(() => { $('preview').src = 'tank.html?' + params(true); }, 500);
+    listen();
+  }
+  for (const k of fields) $(k).addEventListener('input', refresh);
+  $('decos').addEventListener('change', () => {
+    state.decos = [...$('decos').querySelectorAll('input:checked')].map((c) => c.value);
+    refresh();
+  });
+
+  // ───────── 忠誠點品項偵測（聽聊天室裡帶 custom-reward-id 的訊息） ─────────
+  let chat = null, chatFor = '';
+  function listen() {
+    const ch = channel();
+    if (ch === chatFor) return;
+    chat && chat.stop();
+    chat = null;
+    chatFor = ch;
+    if (!ch) { $('listenDot').className = 'dot'; $('listenText').textContent = '填頻道名稱後開始偵測'; return; }
+    chat = connectChat(ch, (m) => {
+      const id = m.tags && m.tags['custom-reward-id'];
+      if (!id) return;
+      state.seen[id] = { text: m.text, by: m.display, at: Date.now() };
+      refresh();
+    }, (s) => {
+      $('listenDot').className = 'dot' + (s === 'joined' ? ' on' : '');
+      $('listenText').textContent = s === 'joined' ? `正在偵測 #${ch} 的兌換…（去兌換一次需要輸入文字的品項）` : '連線中…';
+    });
+  }
+
+  function renderRewards() {
+    const box = $('rewards');
+    const ids = [...new Set([...Object.keys(state.seen), ...Object.keys(state.rewards)])];
+    box.innerHTML = '';
+    for (const id of ids) {
+      const seen = state.seen[id];
+      const row = document.createElement('div');
+      row.className = 'reward';
+      const opts = ['<option value="">不做事</option>', ...Object.entries(C.REWARD_ACTIONS).map(([k, v]) => `<option value="${k}"${state.rewards[id] === k ? ' selected' : ''}>${v}</option>`)].join('');
+      row.innerHTML = `<div><b></b><small>${id}</small></div><select>${opts}</select><button class="ghost" title="移除">✕</button>`;
+      row.querySelector('b').textContent = seen ? `${seen.by}：「${seen.text}」` : '（之前設定的品項）';
+      row.querySelector('select').addEventListener('change', (e) => {
+        if (e.target.value) state.rewards[id] = e.target.value; else delete state.rewards[id];
+        refresh();
+      });
+      row.querySelector('button').addEventListener('click', () => { delete state.rewards[id]; delete state.seen[id]; refresh(); });
+      box.append(row);
+    }
+  }
+
+  // ───────── 試算表 ─────────
+  let scriptSrc = '';
+  $('copyScript').addEventListener('click', async () => {
+    try {
+      if (!scriptSrc) { const r = await fetch('sheet-script.gs', { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); scriptSrc = await r.text(); }
+      await navigator.clipboard.writeText(scriptSrc.replace('__KEY__', state.skey));
+      $('copyScript').textContent = '已複製 ✓';
+      setTimeout(() => ($('copyScript').textContent = '複製程式碼'), 1500);
+    } catch (e) {
+      $('storeMsg').className = 'msg bad';
+      $('storeMsg').textContent = '複製失敗：' + e.message;
+    }
+  });
+  $('testStore').addEventListener('click', async () => {
+    const url = $('store').value.trim();
+    const msg = $('storeMsg');
+    if (!/^https:\/\/script\.google\.com\//.test(url)) { msg.className = 'msg bad'; msg.textContent = '網址要是 https://script.google.com/ 開頭'; return; }
+    msg.className = 'msg';
+    msg.textContent = '連線中…';
+    try {
+      const r = await fetch(url, { method: 'POST', body: JSON.stringify({ key: state.skey, action: 'list' }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error === '暗號不對' ? '暗號不對：請重新複製程式碼、貼上、再部署一次「新版本」' : j.error);
+      msg.className = 'msg ok';
+      msg.textContent = `✓ 連上了，試算表裡現在有 ${Object.keys(j.profiles || {}).length} 隻魚。記得重新複製 OBS 網址。`;
+    } catch (e) {
+      msg.className = 'msg bad';
+      msg.textContent = '連不上：' + (e.message === 'Failed to fetch' ? '存取權要選「所有人」，或網址不是 /exec 結尾' : e.message);
+    }
+  });
+  $('newKey').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!confirm('換暗號後，舊的試算表程式碼就不能用了，要重新複製、貼上、部署。確定？')) return;
+    state.skey = newKey();
+    $('storeMsg').className = 'msg';
+    $('storeMsg').textContent = '已換新暗號，請重新複製程式碼並部署新版本。';
+    refresh();
+  });
+
+  $('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('url').value); } catch { $('url').select(); document.execCommand('copy'); }
+    $('copy').textContent = '已複製';
+    setTimeout(() => ($('copy').textContent = '複製'), 1500);
+  });
+  refresh();
+</script>
+</body>
+</html>

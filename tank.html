@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>直播水族箱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tank.css">
+</head>
+<body>
+<canvas id="tank"></canvas>
+
+<div id="tip" class="tip"></div>
+<div id="status" class="status"></div>
+<div id="banner" class="banner"></div>
+
+<div id="help" class="help">
+  <h2>🐠 水族箱指令</h2>
+  <dl>
+    <dt>!魚</dt><dd>變成一隻魚加入</dd>
+    <dt>!鯊魚 !河豚 !水母 !金魚 !小丑魚 !神仙魚</dt><dd>換魚種</dd>
+    <dt>!鯨魚 !獨角鯨 !錦鯉</dt><dd>稀有魚種：<span id="help-rare"></span></dd>
+    <dt>!顏色 紅／彩虹／#66ccff</dt><dd>換顏色</dd>
+    <dt>!跳 !衝 !轉 !睡 !泡泡</dt><dd>做動作</dd>
+    <dt>!餵</dt><dd>撒飼料，吃越多長越大</dd>
+    <dt>!抱 @名字　!跟 @名字</dt><dd>找別人互動</dd>
+    <dt>!離開</dt><dd>游走</dd>
+  </dl>
+</div>
+
+<div id="demo" class="demo" hidden>
+  <div class="demo-head">測試聊天室 <button type="button" data-act="hide">－</button></div>
+  <form>
+    <div class="row"><input name="user" value="YY2401" placeholder="觀眾名稱"><label><input type="checkbox" name="mod"> 實況主</label></div>
+    <div class="row"><input name="text" placeholder="輸入聊天訊息或 !指令" autocomplete="off"><button>送出</button></div>
+  </form>
+  <div class="chips">
+    <button data-cmd="!魚">!魚</button><button data-cmd="!跳">!跳</button><button data-cmd="!衝">!衝</button>
+    <button data-cmd="!轉">!轉</button><button data-cmd="!睡">!睡</button><button data-cmd="!泡泡">!泡泡</button>
+    <button data-cmd="!餵">!餵</button><button data-cmd="!鯊魚">!鯊魚</button><button data-cmd="!河豚">!河豚</button>
+    <button data-cmd="!水母">!水母</button><button data-cmd="!顏色 彩虹">!顏色 彩虹</button><button data-cmd="!fishhelp">!fishhelp</button>
+  </div>
+  <div class="chips">
+    <button type="button" class="alt" data-act="sub">模擬訂閱</button><button type="button" class="alt" data-act="bits">模擬小奇點</button><button type="button" class="alt" data-act="raid">模擬揪團</button>
+    <button type="button" class="alt" data-event="shark">🦈 鯊魚</button><button type="button" class="alt" data-event="whirl">🌀 漩渦</button><button type="button" class="alt" data-event="treasure">💰 寶箱</button>
+  </div>
+  <button type="button" class="wide" data-act="bots">＋ 加 8 隻會自己講話的測試魚（可以一直按）</button>
+</div>
+
+<script src="fish-core.js"></script>
+<script src="chat.js"></script>
+<script src="tank.js"></script>
+</body>
+</html>
