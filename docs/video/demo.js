@@ -75,6 +75,10 @@ const NAMES = ['小魚乾', '阿宅不睡覺', 'Momo_TW', '路過的貓', 'kiwi_
   await chat(5, '!頭像 大頭貼');
   await sleep(4000);
 
+  await cap('!戴 皇冠、!花紋 星星：配件和花紋可以自由搭配');
+  for (const [i, t] of [[1, '!戴 皇冠'], [6, '!戴 海盜帽'], [8, '!戴 光環'], [9, '!戴 眼鏡'], [11, '!戴 花'], [1, '!花紋 星星'], [9, '!花紋 條紋'], [13, '!戴 帽子']]) { await chat(i, t); await sleep(450); }
+  await sleep(3500);
+
   await cap('!抱 @名字 游過去給對方抱抱');
   await chat(3, '!抱 @v8');
   await sleep(4500);

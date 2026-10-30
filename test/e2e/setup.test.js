@@ -76,6 +76,7 @@ if (!H.chromePath()) {
     let key = null;
     const page = await open(t, { sheet: (body) => { key = body.key; return { ok: true, profiles: { a: {}, b: {} } }; } });
     await page.evaluate(() => { window.__copied = ''; navigator.clipboard.writeText = async (s) => { window.__copied = s; }; });
+    await page.click('#advanced summary');
     await page.click('#copyScript');
     await page.waitForFunction(() => window.__copied.length > 0);
     const code = await page.evaluate(() => window.__copied);
@@ -95,6 +96,7 @@ if (!H.chromePath()) {
 
   test('試算表網址打錯會提醒', async (t) => {
     const page = await open(t);
+    await page.click('#advanced summary');
     await typeInto(page, '#store', 'https://example.com/x');
     await page.click('#testStore');
     assert.match(await page.$eval('#storeMsg', (e) => e.textContent), /script\.google\.com/);
@@ -127,28 +129,50 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
-  test('自訂魚種：上傳圖片要先接試算表；接好後存到雲端硬碟並自動加入', async (t) => {
-    const uploads = [];
-    const sheet = (body) => {
-      if (body.action === 'upload') { uploads.push(body); return { ok: true, url: 'https://lh3.googleusercontent.com/d/abc123' }; }
-      return { ok: true, profiles: {} };
-    };
-    const page = await open(t, { sheet, routes: { 'https://lh3.googleusercontent.com/': {} } });
-    const file = require('node:path').join(require('node:os').tmpdir(), 'fishtank-chick.png');
-    require('node:fs').writeFileSync(file, H.PNG);
-
-    const input = await page.$('#skinFile');
-    await input.uploadFile(file);
-    await page.waitForFunction(() => /試算表/.test(document.getElementById('skinMsg').textContent));
-    assert.equal(uploads.length, 0, '沒接試算表時不能上傳');
-
-    await typeInto(page, '#store', 'https://script.google.com/macros/s/TEST/exec');
+  test('自訂魚種：上傳圖片不用任何帳號，縮小後直接放進 OBS 網址', async (t) => {
+    const page = await open(t);
+    const file = require('node:path').join(require('node:os').tmpdir(), 'fishtank-big.png');
+    // 一張 600×400 的圖：上傳後要縮到最寬 160
+    const big = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 600; c.height = 400; const g = c.getContext('2d'); g.fillStyle = '#ffcc00'; g.fillRect(0, 0, 600, 400); return c.toDataURL('image/png').split(',')[1]; });
+    require('node:fs').writeFileSync(file, Buffer.from(big, 'base64'));
     await typeInto(page, '#skinName', '小雞');
-    await input.uploadFile(file);
+    await (await page.$('#skinFile')).uploadFile(file);
     await page.waitForFunction(() => /加好了/.test(document.getElementById('skinMsg').textContent));
-    assert.equal(uploads.length, 1);
-    assert.equal(uploads[0].mime, 'image/png');
-    assert.equal(Buffer.from(uploads[0].data, 'base64').length, H.PNG.length, '圖片內容完整上傳');
-    assert.deepEqual((await obsUrl(page)).getAll('skin'), ['小雞|https://lh3.googleusercontent.com/d/abc123']);
+    const skin = (await obsUrl(page)).getAll('skin')[0];
+    assert.match(skin, /^小雞\|data:image\/(webp|png);base64,/);
+    const size = await page.evaluate((u) => new Promise((res) => { const i = new Image(); i.onload = () => res([i.naturalWidth, i.naturalHeight]); i.src = u; }), skin.split('|')[1]);
+    assert.deepEqual(size, [160, 107]);
+    assert.ok(skin.length < 8000, '縮小後的圖要夠小，網址才放得下');
+    assert.equal(await page.$eval('#urlMsg', (e) => e.textContent), '');
+  });
+
+  test('魚缸外觀：配色、自訂顏色、畫面元素、海草、背景圖片都寫進網址', async (t) => {
+    const page = await open(t);
+    await page.click('[data-theme="sunset"]');
+    let p = await obsUrl(page);
+    assert.equal(p.get('theme'), 'sunset');
+    assert.ok(!p.has('water'));
+    assert.equal(await page.$eval('#colorRow', (e) => getComputedStyle(e).display), 'none', '沒勾「自己選顏色」時不顯示色票');
+    await page.click('#customColor');
+    assert.notEqual(await page.$eval('#colorRow', (e) => getComputedStyle(e).display), 'none');
+    p = await obsUrl(page);
+    assert.equal(p.get('water'), '#ff9a6b,#4a2a6a', '自訂顏色從目前的主題開始');
+    assert.equal(p.get('sand'), '#e8b98a');
+    await page.click('#layers input[value="rays"]');
+    await page.click('#layers input[value="rocks"]');
+    await page.select('#weed', '3');
+    await typeInto(page, '#bgimg', 'https://img.example.com/bg.jpg');
+    p = await obsUrl(page);
+    assert.equal(p.get('hide'), 'rays,rocks');
+    assert.equal(p.get('weed'), '3');
+    assert.equal(p.get('bgimg'), 'https://img.example.com/bg.jpg');
+    await page.click('#submit');
+    assert.equal((await obsUrl(page)).get('submit'), '0');
+    await page.reload({ waitUntil: 'load' });
+    p = await obsUrl(page);
+    assert.equal(p.get('theme'), 'sunset', '重新整理後還在');
+    assert.equal(p.get('hide'), 'rays,rocks');
+    assert.equal(await page.$eval('#layers input[value="rays"]', (e) => e.checked), false);
+    assert.deepEqual(page.errors, []);
   });
 }

@@ -95,3 +95,33 @@ test('水族箱範圍：預設全畫面、留白太多時等比例縮小', () =>
   assert.strictEqual(o.bottom, 0);
   assert.ok(Math.abs(o.left - 0.425) < 1e-9 && Math.abs(o.right - 0.425) < 1e-9);
 });
+
+test('背景配色：主題、自訂水色與沙色、可關掉的元素、海草多寡、背景圖片網址', () => {
+  const o = C.readOptions('?theme=night&water=%23112233,%23000000&sand=ffeecc&hide=rays,nope,rocks&weed=9&bgimg=https://x.y/a.png');
+  assert.strictEqual(o.themeId, 'night');
+  assert.deepStrictEqual(o.theme.water, ['#112233', '#09111a', '#000000']);
+  assert.strictEqual(o.theme.sand[0], '#ffeecc');
+  assert.deepStrictEqual(o.hide, ['rays', 'rocks']);
+  assert.strictEqual(o.weed, 3);
+  assert.strictEqual(o.bgimg, 'https://x.y/a.png');
+  const d = C.readOptions('?theme=nope&water=red,blue&bgimg=javascript:x');
+  assert.strictEqual(d.themeId, 'ocean');
+  assert.deepStrictEqual(d.theme.water, C.THEMES.ocean.water);
+  assert.strictEqual(d.bgimg, '');
+  assert.strictEqual(d.weed, 1);
+});
+
+test('配件與花紋：中英文都認得，「關」代表拿掉', () => {
+  assert.strictEqual(C.findWear('皇冠'), 'crown');
+  assert.strictEqual(C.findWear('Glasses'), 'glasses');
+  assert.strictEqual(C.findWear('關'), '');
+  assert.strictEqual(C.findWear('飛機'), null);
+  assert.strictEqual(C.findPattern('點點'), 'spots');
+  assert.deepStrictEqual(C.parseCommand('!我的魚 https://a.b/c.png'), { cmd: 'mine', arg: 'https://a.b/c.png', target: null });
+  assert.strictEqual(C.parseCommand('!戴 帽子').cmd, 'wear');
+});
+
+test('自訂魚種圖片：https 或縮小後的圖片資料，其他（javascript:、非圖片資料）都擋', () => {
+  const k = C.parseSkins(['a|https://x.y/a.png', 'b|data:image/webp;base64,UklGRg==', 'c|data:text/html;base64,PGI+', 'd|javascript:alert(1)']);
+  assert.deepStrictEqual(k.map((x) => x.name), ['a', 'b']);
+});

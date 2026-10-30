@@ -40,6 +40,17 @@
   .area { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
   .area label { margin-bottom: 6px; }
   .area input { width: 100%; }
+  .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 10px; }
+  .theme { padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; color: var(--text); font-weight: 500; font-size: 12px; }
+  .theme i { display: block; height: 30px; }
+  .theme span { display: block; padding: 2px 0 3px; background: #071c2e; }
+  .theme.on { border-color: var(--accent); }
+  .colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .colors[hidden] { display: none; }
+  .colors label { margin: 0; }
+  .colors input { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: #071c2e; padding: 2px; }
+  details.adv summary { cursor: pointer; font-weight: 700; font-size: 15px; }
+  details.adv[open] summary { margin-bottom: 4px; }
   .skins { display: grid; gap: 6px; margin: 8px 0; }
   .skin { display: grid; grid-template-columns: 48px 1fr auto; gap: 8px; align-items: center; background: #071c2e; border-radius: 8px; padding: 6px 8px; }
   .skin img { width: 48px; height: 36px; object-fit: contain; background: repeating-conic-gradient(#173a57 0 25%, #0f2c44 0 50%) 0 0 / 12px 12px; border-radius: 4px; }
@@ -96,16 +107,28 @@
     </section>
 
     <section>
-      <h2>2. 魚缸裝飾與大事件</h2>
-      <div class="lbl">裝飾（擺在魚缸底部）</div>
+      <h2>2. 魚缸外觀與大事件</h2>
+      <div class="lbl">配色（背景選「完整水族箱」時才有）</div>
+      <div class="themes" id="themes"></div>
+      <label class="check"><input type="checkbox" id="customColor"><div><span>自己選顏色</span></div></label>
+      <div class="colors" id="colorRow" hidden>
+        <label><span>水面</span><input type="color" id="waterTop" value="#1d7fb0"></label>
+        <label><span>深處</span><input type="color" id="waterBottom" value="#07304f"></label>
+        <label><span>沙子</span><input type="color" id="sandColor" value="#d8bf86"></label>
+      </div>
+      <div class="lbl">畫面上要有哪些東西</div>
+      <div class="checks" id="layers"></div>
+      <label><span>海草</span><select id="weed"><option value="0">沒有</option><option value="1" selected>一般</option><option value="2">多</option><option value="3">很多</option></select></label>
+      <label><span>背景圖片（選用）</span><input type="text" id="bgimg" placeholder="圖片網址 https://…，留空就用上面的配色"><em>想用自己的背景圖：把圖放在能公開看的地方（例如 Imgur、Discord），貼上圖片網址</em></label>
+      <div class="lbl" id="decoLbl">裝飾（擺在魚缸底部）</div>
       <div class="checks" id="decos"></div>
       <label><span>每幾分鐘隨機來一次大事件</span><input type="number" id="event" min="0" max="240" value="15"><em>鯊魚出沒、大漩渦、寶箱掉落輪流來；填 0 關掉。實況主或管理員也可以打 !tank shark／whirl／treasure 手動叫</em></label>
     </section>
 
     <section>
-      <h2>3. 自訂魚種與頭像</h2>
+      <h2>3. 自訂魚種與觀眾外觀</h2>
       <div class="lbl">本頻道限定魚種</div>
-      <em>上傳圖片（或貼圖片網址）並取個名字，觀眾打 <b>!名字</b> 就會變成這張圖游來游去。建議用<b>透明背景、魚頭朝右</b>的 PNG。</em>
+      <em>取個名字、按「上傳」選一張圖，觀眾打 <b>!名字</b> 就會變成這張圖游來游去。建議用<b>透明背景、魚頭朝右</b>的 PNG。</em>
       <div class="skins" id="skins"></div>
       <div class="skin-add">
         <input type="text" id="skinName" placeholder="名字，例如 小雞" maxlength="12">
@@ -114,10 +137,13 @@
         <button class="ghost" id="skinAdd">加入</button>
       </div>
       <div class="msg" id="skinMsg"></div>
-      <em>上傳的圖片存到你的 Google 雲端硬碟，要先接好第 5 步的試算表。觀眾不能自己貼圖片，避免不適合的圖出現在直播上。</em>
+      <em>上傳的圖會自動縮小、直接放進 OBS 網址，不用任何帳號。網址有長度上限，大約可以放 3～4 張。</em>
       <div class="lbl" id="avatarLbl" style="margin-top:14px">觀眾頭像</div>
       <em>觀眾打 <b>!頭像</b> 加一個表情符號，那個表情就會貼在他的魚身上（表情都經過 Twitch 審核）。打 <b>!頭像 關</b> 拿掉。</em>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="pfp" checked><div><span>也可以用 !頭像 大頭貼 放 Twitch 大頭貼</span><em>大頭貼網址透過 decapi.me（免登入的公開服務）查詢</em></div></label>
+      <div class="lbl" id="wearLbl" style="margin-top:14px">觀眾自己打扮</div>
+      <em>觀眾可以隨時用 <b>!戴 帽子／皇冠／眼鏡／蝴蝶結／海盜帽／花／耳機／光環</b> 和 <b>!花紋 條紋／斑點／星星／愛心</b>，跟魚種、顏色、頭像自由搭配，不用設定。</em>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="submit" checked><div><span>觀眾可以提交自己的魚圖片</span><em>觀眾打 <b>!我的魚 圖片網址</b>，<b>要等實況主或管理員打 !tank ok @名字</b> 才會出現在畫面上（!tank no @名字 退回）。核准前請先點開網址看過圖片。</em></div></label>
     </section>
 
     <section>
@@ -132,8 +158,9 @@
     </section>
 
     <section>
-      <h2>5. 換電腦也記得每隻魚（選用）</h2>
-      <em style="margin-bottom:10px">魚的外觀平常記在 OBS 裡。接上 Google 試算表後存在雲端，換電腦、重灌 OBS 都還在，也能直接在試算表改。第 3 步上傳的自訂魚種圖片也會存到你的雲端硬碟。</em>
+      <details class="adv" id="advanced">
+      <summary>進階（選用）：換電腦也記得每隻魚</summary>
+      <em style="margin:10px 0">大部分人不需要這個：觀眾的魚（魚種、顏色、配件、長大的大小）平常就記在 OBS 裡，同一台電腦開台都還在。只有<b>要換電腦或重灌 OBS</b> 時才需要接 Google 試算表；設定要進 Google Apps Script，比較麻煩。</em>
       <ol>
         <li>開一份新的 Google 試算表 → 擴充功能 → Apps Script</li>
         <li><button class="ghost" id="copyScript">複製程式碼</button> 整段貼上（取代原本內容）→ 儲存</li>
@@ -143,13 +170,15 @@
       <div class="url"><input type="text" id="store" placeholder="https://script.google.com/macros/s/…/exec"><button class="ghost" id="testStore">測試連線</button></div>
       <div class="msg" id="storeMsg"></div>
       <em style="margin-top:8px">程式碼裡有一組只屬於你的暗號，OBS 網址也會帶著它。<a href="#" id="newKey" style="color:var(--muted)">換一組暗號</a>（換了要重新複製程式碼、重新部署）</em>
+      </details>
     </section>
   </div>
 
   <div class="right">
     <section>
-      <h2>6. 複製到 OBS</h2>
+      <h2>5. 複製到 OBS</h2>
       <div class="url"><input type="text" id="url" readonly><button id="copy">複製</button></div>
+      <div class="msg" id="urlMsg"></div>
       <p style="color:var(--muted);margin:8px 0 0;font-size:13px">OBS → 來源 → ＋ → 瀏覽器 → 貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。改了上面任何設定都要重新複製。</p>
     </section>
     <section>
@@ -166,11 +195,14 @@
         <tr><td>!跳 !衝 !轉 !睡 !泡泡</td><td>跳出水面、衝刺、轉圈、沉到底睡覺、吐泡泡（河豚會膨脹）</td></tr>
         <tr><td>!餵 / !餵 @名字 / !餵 大家</td><td>撒飼料給自己 / 請別人吃 / 全場一起吃，吃到會變大（最大 2 倍）</td></tr>
         <tr><td>!頭像 表情符號 / !頭像 大頭貼</td><td>把表情符號或 Twitch 大頭貼貼在魚身上（!頭像 關 拿掉）</td></tr>
+        <tr><td>!戴 帽子 / !花紋 條紋</td><td>配件：帽子 皇冠 眼鏡 蝴蝶結 海盜帽 花 耳機 光環；花紋：條紋 斑點 星星 愛心（關 拿掉）</td></tr>
+        <tr><td>!我的魚 圖片網址</td><td>提交自己的魚，實況主或管理員核准後才會出現</td></tr>
         <tr><td>!抱 @名字 / !跟 @名字</td><td>游過去抱抱冒愛心 / 跟在對方後面游 30 秒</td></tr>
         <tr><td>!離開</td><td>游出畫面</td></tr>
         <tr><td>!fishhelp</td><td>畫面中間顯示指令說明</td></tr>
         <tr><td>!tank shark / whirl / treasure</td><td>（實況主、管理員）鯊魚出沒 / 大漩渦 / 寶箱掉落</td></tr>
         <tr><td>!tank feed / clear</td><td>（實況主、管理員）全場撒飼料 / 清空魚缸</td></tr>
+        <tr><td>!tank ok @名字 / !tank no @名字</td><td>（實況主、管理員）核准 / 退回觀眾提交的魚圖片</td></tr>
       </table>
     </section>
   </div>
@@ -180,9 +212,35 @@
 <script>
   const C = FishCore;
   const $ = (id) => document.getElementById(id);
-  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store', 'pfp'];
+  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store', 'pfp', 'submit', 'customColor', 'waterTop', 'waterBottom', 'sandColor', 'weed', 'bgimg'];
   const SAVE = 'fishtank.setup.v1';
-  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [] };
+  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [], theme: 'ocean', hide: [] };
+
+  // 配色主題按鈕（點了就套用，顏色欄位也換成那個主題的顏色）
+  for (const [id, th] of Object.entries(C.THEMES)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'theme';
+    b.dataset.theme = id;
+    b.innerHTML = `<i style="background:linear-gradient(${th.water[0]},${th.water[2]} 70%,${th.sand[0]} 70%)"></i><span>${th.name}</span>`;
+    b.addEventListener('click', () => {
+      state.theme = id;
+      $('waterTop').value = th.water[0];
+      $('waterBottom').value = th.water[2];
+      $('sandColor').value = th.sand[0];
+      refresh();
+    });
+    $('themes').append(b);
+  }
+  for (const [id, name] of Object.entries(C.LAYERS)) {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox" value="${id}" checked> ${name}`;
+    $('layers').append(l);
+  }
+  $('layers').addEventListener('change', () => {
+    state.hide = [...$('layers').querySelectorAll('input:not(:checked)')].map((c) => c.value);
+    refresh();
+  });
 
   // 裝飾勾選
   for (const [id, name] of Object.entries(C.DECOS)) {
@@ -198,6 +256,7 @@
   } catch { /* 沒存過 */ }
   if (!state.skey) state.skey = newKey();
   for (const c of $('decos').querySelectorAll('input')) c.checked = state.decos.includes(c.value);
+  for (const c of $('layers').querySelectorAll('input')) c.checked = !state.hide.includes(c.value);
 
   function newKey() {
     const a = new Uint8Array(12);
@@ -226,6 +285,12 @@
     const rw = C.stringifyRewards(state.rewards);
     if (rw) p.set('rw', rw);
     if (!$('pfp').checked) p.set('pfp', '0');
+    if (!$('submit').checked) p.set('submit', '0');
+    if (state.theme !== 'ocean') p.set('theme', state.theme);
+    if ($('customColor').checked) { p.set('water', $('waterTop').value + ',' + $('waterBottom').value); p.set('sand', $('sandColor').value); }
+    if (state.hide.length) p.set('hide', state.hide.join(','));
+    if (+$('weed').value !== 1) p.set('weed', $('weed').value);
+    if (/^https:\/\//.test($('bgimg').value.trim())) p.set('bgimg', $('bgimg').value.trim());
     for (const k of state.skins) p.append('skin', `${k.name}|${k.url}`);
     if ($('store').value.trim()) { p.set('store', $('store').value.trim()); p.set('skey', state.skey); }
     if (demo) { p.set('demo', '1'); p.delete('store'); p.delete('skey'); } // 預覽不寫進試算表
@@ -242,6 +307,11 @@
     try { localStorage.setItem(SAVE, JSON.stringify(s)); } catch { /* 無痕模式 */ }
     renderRewards();
     renderSkins();
+    $('colorRow').hidden = !$('customColor').checked;
+    for (const b of $('themes').children) b.classList.toggle('on', b.dataset.theme === state.theme);
+    const len = $('url').value.length;
+    $('urlMsg').className = 'msg' + (len > 30000 ? ' bad' : '');
+    $('urlMsg').textContent = len > 30000 ? `網址太長（${len} 字），OBS 可能貼不進去：請移除一兩張自訂魚種圖片` : '';
     clearTimeout(timer);
     timer = setTimeout(() => { $('preview').src = 'tank.html?' + params(true); }, 500);
     listen();
@@ -303,7 +373,7 @@
       row.querySelector('img').src = k.url;
       row.querySelector('img').onerror = () => { row.querySelector('small').textContent = '⚠ 圖片打不開，檢查網址'; };
       row.querySelector('b').textContent = '!' + k.name;
-      row.querySelector('small').textContent = k.url;
+      row.querySelector('small').textContent = k.url.startsWith('data:') ? `上傳的圖（${Math.round(k.url.length / 1024)} KB）` : k.url;
       row.querySelector('button').addEventListener('click', () => { state.skins.splice(i, 1); refresh(); });
       box.append(row);
     });
@@ -315,7 +385,7 @@
     if (/[\s|]/.test(name)) return skinMsg('名字不能有空白或「|」', 'bad');
     if (C.findSpecies(name) || C.parseCommand('!' + name)) return skinMsg(`「${name}」跟內建的魚種或指令重複了，換一個名字`, 'bad');
     if (state.skins.some((k) => k.name === name)) return skinMsg(`已經有「${name}」了`, 'bad');
-    if (!/^https:\/\//.test(url)) return skinMsg('圖片網址要是 https:// 開頭', 'bad');
+    if (!C.IMAGE_URL.test(url)) return skinMsg('圖片網址要是 https:// 開頭', 'bad');
     state.skins.push({ name, url });
     $('skinName').value = '';
     $('skinUrl').value = '';
@@ -323,24 +393,31 @@
     refresh();
   }
   $('skinAdd').addEventListener('click', () => addSkin($('skinName').value, $('skinUrl').value.trim()));
+  // 上傳：在瀏覽器裡縮小成最寬 160 像素的 WebP，直接變成網址的一部分（不用任何帳號）
+  async function shrink(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('這個檔案不是圖片')); i.src = url; });
+      const k = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * k));
+      c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const webp = c.toDataURL('image/webp', 0.85);
+      return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/png');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
   $('skinFile').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    const store = $('store').value.trim();
-    if (!/^https:\/\/script\.google\.com\//.test(store)) return skinMsg('上傳要先接好第 5 步的 Google 試算表；或直接貼圖片網址', 'bad');
-    if (file.size > 2 * 1024 * 1024) return skinMsg('圖片要小於 2 MB', 'bad');
-    skinMsg('上傳中…');
+    if (!$('skinName').value.trim()) $('skinName').value = file.name.replace(/\.[^.]+$/, '').replace(/[\s|]/g, '').slice(0, 12);
     try {
-      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
-      const r = await fetch(store, { method: 'POST', body: JSON.stringify({ key: state.skey, action: 'upload', name: file.name, mime: file.type, data }) });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error === '不認得的動作' ? '試算表的程式碼是舊版：重新複製程式碼、貼上，部署新版本' : j.error);
-      $('skinUrl').value = j.url;
-      if (!$('skinName').value.trim()) $('skinName').value = file.name.replace(/\.[^.]+$/, '').slice(0, 12);
-      addSkin($('skinName').value, j.url);
+      addSkin($('skinName').value, await shrink(file));
     } catch (err) {
-      skinMsg('上傳失敗：' + (err.message === 'Failed to fetch' ? '連不上試算表，先按第 5 步的「測試連線」' : err.message), 'bad');
+      skinMsg('上傳失敗：' + err.message, 'bad');
     }
   });
 

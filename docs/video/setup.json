@@ -39,11 +39,32 @@
       "duration": 5.5
     },
     {
-      "caption": "勾選魚缸裝飾，設定大事件（鯊魚、漩渦、寶箱）多久來一次",
-      "highlight": "#decos"
+      "caption": "「2. 魚缸外觀」點一個配色就換背景，光線、石頭、海草也可以自己決定要不要",
+      "highlight": "#themes",
+      "duration": 5.5,
+      "before": [
+        {
+          "scroll": "#layers"
+        },
+        {
+          "click": "[data-theme=\"tropical\"]"
+        },
+        {
+          "wait": 800
+        }
+      ]
     },
     {
-      "caption": "想要本頻道限定魚種：取個名字、上傳圖片（或貼圖片網址），觀眾打 !名字 就能變身",
+      "caption": "再往下勾選魚缸裝飾，設定大事件（鯊魚、漩渦、寶箱）多久來一次",
+      "highlight": "#decos",
+      "before": [
+        {
+          "scroll": "#event"
+        }
+      ]
+    },
+    {
+      "caption": "想要本頻道限定魚種：取個名字、按「上傳」選一張圖，觀眾打 !名字 就能變身",
       "highlight": ".skin-add",
       "duration": 5.5,
       "before": [
@@ -63,7 +84,7 @@
       ]
     },
     {
-      "caption": "設定好了，到右上「6. 複製到 OBS」按「複製」",
+      "caption": "設定好了，到右上「5. 複製到 OBS」按「複製」",
       "highlight": "#copy"
     },
     {

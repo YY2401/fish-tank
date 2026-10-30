@@ -1,16 +1,13 @@
 /**
- * 直播水族箱：把每位觀眾的魚（魚種、顏色、大小、解鎖的稀有魚種、頭像）存在這份試算表
- * 換電腦、換 OBS 都還記得。也可以直接在試算表改，水族箱每 10 分鐘會重讀一次。
- * 設定頁上傳的自訂魚種圖片會存到你的雲端硬碟「直播水族箱圖片」資料夾（知道連結的人可以看）。
+ * 直播水族箱：把每位觀眾的魚（魚種、顏色、大小、解鎖的稀有魚種、頭像、配件、花紋、核准過的個人魚圖片）
+ * 存在這份試算表，換電腦、換 OBS 都還記得。也可以直接在試算表改，水族箱每 10 分鐘會重讀一次。
  *
  * 安裝：試算表 → 擴充功能 → Apps Script → 整段貼上 → 部署 → 新增部署作業
  *       → 類型選「網頁應用程式」→ 執行身分「我」、存取權「所有人」→ 部署 → 複製網址貼回設定頁
  */
 const KEY = '__KEY__'; // 設定頁複製時自動填入的暗號，OBS 網址裡要有同一組才能讀寫
 const SHEET = '水族箱的魚';
-const HEAD = ['帳號', '顯示名稱', '魚種', '顏色', '大小', '解鎖的稀有魚種', '最後更新', '頭像'];
-const FOLDER = '直播水族箱圖片';
-const MAX_UPLOAD = 2 * 1024 * 1024; // 圖片最大 2 MB
+const HEAD = ['帳號', '顯示名稱', '魚種', '顏色', '大小', '解鎖的稀有魚種', '最後更新', '頭像', '配件', '花紋', '個人魚圖片'];
 
 function doGet() {
   return out_({ ok: true, hello: '直播水族箱' });
@@ -27,7 +24,6 @@ function doPost(e) {
     try { save_(body.profiles || []); } finally { lock.releaseLock(); }
     return out_({ ok: true });
   }
-  if (body.action === 'upload') return out_(upload_(body));
   return out_({ ok: false, error: '不認得的動作' });
 }
 
@@ -64,6 +60,9 @@ function list_() {
       size: Number(r[4]) || 1,
       unlocked: String(r[5] || '').split(',').map(function (s) { return s.trim(); }).filter(String),
       avatar: avatarOf_(r[7]),
+      wear: String(r[8] || '') || null,
+      pattern: String(r[9] || '') || null,
+      mine: /^https:\/\//.test(String(r[10] || '')) ? String(r[10]) : null,
     };
   });
   return out;
@@ -79,23 +78,10 @@ function save_(profiles) {
     const login = String(p.login || '').trim().toLowerCase();
     if (!login) return;
     const avatar = p.avatar && p.avatar.url ? p.avatar.kind + '|' + p.avatar.url : '';
-    const row = [login, p.display || login, p.species || '', p.color || '', p.size || 1, (p.unlocked || []).join(','), now, avatar];
+    const row = [login, p.display || login, p.species || '', p.color || '', p.size || 1, (p.unlocked || []).join(','), now, avatar, p.wear || '', p.pattern || '', p.mine || ''];
     if (index[login]) sh.getRange(index[login], 1, 1, row.length).setValues([row]);
     else { sh.appendRow(row); index[login] = sh.getLastRow(); }
   });
-}
-
-// 設定頁上傳的自訂魚種圖片 → 雲端硬碟，回傳可以直接放進 OBS 的圖片網址
-function upload_(body) {
-  const mime = String(body.mime || '');
-  if (!/^image\/(png|jpeg|gif|webp)$/.test(mime)) return { ok: false, error: '只能上傳 PNG、JPG、GIF、WebP 圖片' };
-  const bytes = Utilities.base64Decode(String(body.data || ''));
-  if (!bytes.length || bytes.length > MAX_UPLOAD) return { ok: false, error: '圖片要小於 2 MB' };
-  const it = DriveApp.getFoldersByName(FOLDER);
-  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER);
-  const file = folder.createFile(Utilities.newBlob(bytes, mime, String(body.name || 'fish').slice(0, 60)));
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return { ok: true, url: 'https://lh3.googleusercontent.com/d/' + file.getId() };
 }
 
 function out_(o) {

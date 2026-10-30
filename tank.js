@@ -24,6 +24,11 @@
   const cool = {};
   let now = performance.now();
   const SKIN = Object.fromEntries(opt.skins.map((k) => [k.id, { name: k.name, url: k.url, color: '#ffffff', scale: 1.15, speed: 50, custom: true }]));
+  // 觀眾提交、管理員核准過的個人魚（魚種 ID 是 u:帳號，只有本人能用）
+  function registerMine(login, display, url) {
+    SKIN['u:' + login] = { name: `${display || login} 的魚`, url, color: '#ffffff', scale: 1.15, speed: 50, custom: true, owner: login };
+  }
+  const pending = new Map(); // 等待核准的提交：帳號 → { url, display }
   let frameDt = 0.016;
 
   // ───────── 觀眾外觀：瀏覽器先記一份，有設定試算表就同步到雲端 ─────────
@@ -33,13 +38,17 @@
   let saveTimer = 0;
   const dirty = new Set(); // 還沒寫進試算表的帳號
   function saveProfile(f) {
-    profiles[f.login] = { display: f.display, species: f.species, color: f.color, size: +f.size.toFixed(2), unlocked: f.unlocked.slice(), avatar: f.avatar };
+    profiles[f.login] = { display: f.display, species: f.species, color: f.color, size: +f.size.toFixed(2), unlocked: f.unlocked.slice(), avatar: f.avatar, wear: f.wear, pattern: f.pattern, mine: f.mine };
     dirty.add(f.login);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(profiles)); } catch { /* 無痕或封鎖儲存：只是不記外觀 */ } }, 500);
   }
   function applyProfile(f, p) {
+    f.mine = /^https:\/\//.test(p.mine || '') ? p.mine : null;
+    if (f.mine) registerMine(f.login, p.display || f.display, f.mine);
     if (C.SPECIES[p.species] || SKIN[p.species]) f.species = p.species;
+    f.wear = C.WEARS[p.wear] ? p.wear : null;
+    f.pattern = C.PATTERNS[p.pattern] ? p.pattern : null;
     f.color = p.color || null;
     f.size = clamp(+p.size || 1, 0.6, 2);
     f.unlocked = Array.isArray(p.unlocked) ? p.unlocked.filter((id) => C.SPECIES[id]) : [];
@@ -131,31 +140,59 @@
     if (opt.bg !== 'tank') { bgLayer = null; return; }
     const [c, b] = layer();
     bgLayer = c;
+    const th = opt.theme;
     b.save();
     boxPath(b);
     b.clip();
-    // 水面上方（空氣）
-    const air = b.createLinearGradient(0, Y0, 0, surfaceY);
-    air.addColorStop(0, boxed ? 'rgba(20,50,74,0.35)' : '#0b1622');
-    air.addColorStop(1, boxed ? 'rgba(20,50,74,0.6)' : '#14324a');
-    b.fillStyle = air;
-    b.fillRect(X0, Y0, TW, surfaceY - Y0);
-    // 水
-    const water = b.createLinearGradient(0, surfaceY, 0, Y1);
-    water.addColorStop(0, '#1d7fb0');
-    water.addColorStop(0.45, '#0f5582');
-    water.addColorStop(1, '#07304f');
-    b.fillStyle = water;
-    b.fillRect(X0, surfaceY, TW, Y1 - surfaceY);
-    // 沙
+    // 背景圖片：蓋滿整個魚缸（圖還沒載好就先畫配色，載好再重畫一次）
+    const bgim = opt.bgimg && image(opt.bgimg);
+    if (opt.bgimg && !bgim) images.get(opt.bgimg).addEventListener('load', buildBackground, { once: true });
+    if (bgim) {
+      const k = Math.max(TW / bgim.naturalWidth, (Y1 - Y0) / bgim.naturalHeight);
+      const w = bgim.naturalWidth * k, h = bgim.naturalHeight * k;
+      b.drawImage(bgim, X0 + (TW - w) / 2, Y0 + (Y1 - Y0 - h) / 2, w, h);
+    } else {
+      // 水面上方（空氣）；玻璃魚缸時淡一點，看得到後面的遊戲畫面
+      const air = b.createLinearGradient(0, Y0, 0, surfaceY);
+      air.addColorStop(0, th.air[0]);
+      air.addColorStop(1, th.air[1]);
+      b.globalAlpha = boxed ? 0.5 : 1;
+      b.fillStyle = air;
+      b.fillRect(X0, Y0, TW, surfaceY - Y0);
+      b.globalAlpha = 1;
+      // 水
+      const water = b.createLinearGradient(0, surfaceY, 0, Y1);
+      water.addColorStop(0, th.water[0]);
+      water.addColorStop(0.45, th.water[1]);
+      water.addColorStop(1, th.water[2]);
+      b.fillStyle = water;
+      b.fillRect(X0, surfaceY, TW, Y1 - surfaceY);
+    }
+    if (!opt.hide.includes('sand')) drawSand(b, th);
+    if (!opt.hide.includes('rocks')) drawRocks(b, th);
+    b.restore();
+    if (boxed) drawGlass(b);
+    // 海草（會擺動，所以只記位置，每幀畫）；不比水深高。多寡：0 沒有、1 一般、2 多、3 很多
+    const n = opt.weed ? Math.max(2, Math.round((TW / 110) * [0, 1, 1.8, 2.8][opt.weed])) : 0;
+    const maxH = (floorY - surfaceY) * 0.8;
+    for (let i = 0; i < n; i++) {
+      seaweed.push({
+        x: rx(0.02, 0.98), h: Math.min(maxH, rand(70, 190) * S), seg: 7, ph: rand(0, TAU),
+        color: th.weed[Math.random() < 0.7 ? Math.floor(Math.random() * 2) : 2],
+        w: rand(5, 9) * S,
+      });
+    }
+  }
+
+  function drawSand(b, th) {
     b.beginPath();
     b.moveTo(X0, Y1);
     for (let x = X0; x <= X1 + 20; x += 20) b.lineTo(x, floorY + 6 * S + Math.sin(x * 0.012) * 7 * S + Math.sin(x * 0.031) * 3 * S);
     b.lineTo(X1, Y1);
     b.closePath();
     const sand = b.createLinearGradient(0, floorY - 10 * S, 0, Y1);
-    sand.addColorStop(0, '#d8bf86');
-    sand.addColorStop(1, '#8f744a');
+    sand.addColorStop(0, th.sand[0]);
+    sand.addColorStop(1, th.sand[1]);
     b.fillStyle = sand;
     b.fill();
     // 沙上的小石頭與貝殼點點
@@ -165,30 +202,20 @@
       b.arc(rx(0, 1), rand(floorY + 12 * S, Y1), rand(0.8, 2.4) * S, 0, TAU);
       b.fill();
     }
-    // 大石頭
+  }
+
+  function drawRocks(b, th) {
     const rocks = Math.max(1, Math.round(TW / 420));
     for (let i = 0; i < rocks; i++) {
       const x = X0 + (i + 0.5) * (TW / rocks) + rand(-80, 80) * S;
       const rw = rand(50, 90) * S, rh = rand(30, 55) * S;
       const g = b.createLinearGradient(x, floorY - rh, x, floorY + 10 * S);
-      g.addColorStop(0, '#6d7a86');
-      g.addColorStop(1, '#2f3942');
+      g.addColorStop(0, th.rock[0]);
+      g.addColorStop(1, th.rock[1]);
       b.fillStyle = g;
       b.beginPath();
       b.ellipse(x, floorY + 6 * S, rw, rh, 0, Math.PI, 0);
       b.fill();
-    }
-    b.restore();
-    if (boxed) drawGlass(b);
-    // 海草（會擺動，所以只記位置，每幀畫）；不比水深高
-    const n = Math.max(2, Math.round(TW / 110));
-    const maxH = (floorY - surfaceY) * 0.8;
-    for (let i = 0; i < n; i++) {
-      seaweed.push({
-        x: rx(0.02, 0.98), h: Math.min(maxH, rand(70, 190) * S), seg: 7, ph: rand(0, TAU),
-        color: Math.random() < 0.7 ? `hsl(${rand(120, 150)},55%,${rand(30, 42)}%)` : `hsl(${rand(340, 360)},55%,45%)`,
-        w: rand(5, 9) * S,
-      });
     }
   }
 
@@ -406,7 +433,7 @@
       display: msg.display || msg.login,
       badges: msg.badges || {},
       species: C.defaultSpecies(msg.login),
-      color: null, size: 1, unlocked: [], avatar: null,
+      color: null, size: 1, unlocked: [], avatar: null, wear: null, pattern: null, mine: null,
       hue: C.hashStr(msg.login) % 360,
       x: rx(0.1, 0.9),
       y: surfaceY - 30 * S,
@@ -543,7 +570,8 @@
         speak(f, '掰掰～');
         break;
       case 'skin': {
-        const id = findSkin(cmd.arg);
+        let id = findSkin(cmd.arg);
+        if (['我的魚', '我的', 'mine'].includes(cmd.arg) && f.mine) id = 'u:' + f.login;
         if (!id) { speak(f, '可以變：' + skinNames().join('、'), 6, 60); break; }
         if (!canUse(f, id)) { speak(f, `${spec(id).name}是稀有魚種，${rareHint()}`, 8, 60); break; }
         f.species = id;
@@ -597,6 +625,25 @@
       case 'avatar':
         setAvatar(f, cmd.arg, tags);
         break;
+      case 'wear': {
+        const id = C.findWear(cmd.arg);
+        if (id === null) { speak(f, '可以戴：' + Object.values(C.WEARS).map((w) => w.name).join('、') + '（!戴 關 拿掉）', 6, 60); break; }
+        f.wear = id || null;
+        if (id) poof(f);
+        saveProfile(f);
+        break;
+      }
+      case 'pattern': {
+        const id = C.findPattern(cmd.arg);
+        if (id === null) { speak(f, '花紋有：' + Object.values(C.PATTERNS).map((w) => w.name).join('、') + '（!花紋 關 拿掉）', 6, 60); break; }
+        f.pattern = id || null;
+        if (id) poof(f);
+        saveProfile(f);
+        break;
+      }
+      case 'mine':
+        submitMine(f, cmd.arg);
+        break;
       case 'follow':
       case 'hug': {
         const other = cmd.target && fishes.get(cmd.target);
@@ -606,6 +653,41 @@
         f.other = other.login;
         break;
       }
+    }
+  }
+
+  // !我的魚 圖片網址：先放進待核准清單，管理員 !tank ok @名字 才會顯示；!我的魚 關 換回一般魚
+  function submitMine(f, arg) {
+    const url = String(arg || '').trim();
+    if (['關', '關掉', '取消', 'off', '不要'].includes(url)) {
+      if (SKIN[f.species] && SKIN[f.species].owner) f.species = C.defaultSpecies(f.login);
+      f.mine = null;
+      saveProfile(f);
+      return;
+    }
+    if (!opt.submit) { speak(f, '這個頻道沒有開放自己提交魚的圖片', 6, 40); return; }
+    if (!/^https:\/\/\S+$/.test(url)) { speak(f, '用法：!我的魚 圖片網址（https:// 開頭），管理員核准後才會出現', 8, 60); return; }
+    if (pending.size >= 30 && !pending.has(f.login)) pending.delete(pending.keys().next().value);
+    pending.set(f.login, { url, display: f.display });
+    speak(f, '收到！等管理員核准（!tank ok @' + f.login + '）', 8, 60);
+  }
+  function reviewMine(login, ok) {
+    const p = pending.get(login);
+    if (!p) return;
+    pending.delete(login);
+    const f = fishes.get(login);
+    if (!ok) { if (f) speak(f, '圖片沒有通過，可以換一張再試'); return; }
+    registerMine(login, p.display, p.url);
+    const prof = profiles[login] || {};
+    if (f) {
+      f.mine = p.url;
+      f.species = 'u:' + login;
+      poof(f);
+      speak(f, '我的魚通過了！');
+      saveProfile(f);
+    } else {
+      profiles[login] = { ...prof, display: p.display, species: 'u:' + login, mine: p.url };
+      dirty.add(login);
     }
   }
 
@@ -659,6 +741,8 @@
 
   function tankCommand(arg) {
     const a = arg.trim().toLowerCase();
+    const review = a.match(/^(ok|核准|通過|yes|no|退回|不通過)\s+@?([a-z0-9_]{2,25})/);
+    if (review) return reviewMine(review[2], ['ok', '核准', '通過', 'yes'].includes(review[1]));
     if (a === 'clear' || a === '清空') for (const f of fishes.values()) f.leaving = true;
     else if (a === 'feed' || a === '餵') for (let i = 0; i < 6; i++) dropFood(rx(0.1, 0.9), 5, null);
     else if (a === 'help' || a === '說明') showHelp();
@@ -827,7 +911,7 @@
     }
 
     // 背景氣泡與裝飾冒泡
-    if (Math.random() < dt * 1.2 * (TW / 1280)) bubble(rx(0, 1), floorY, rand(1.5, 4) * S);
+    if (!opt.hide.includes('bubbles') && Math.random() < dt * 1.2 * (TW / 1280)) bubble(rx(0, 1), floorY, rand(1.5, 4) * S);
     for (const e of emitters) {
       const rate = e.kind === 'bubbler' ? 8 : e.kind === 'chest' ? 0.8 : 0.4;
       if (Math.random() < dt * rate) bubble(e.x + rand(-4, 4) * S, e.y, rand(1.5, e.kind === 'bubbler' ? 4 : 6) * S);
@@ -1034,7 +1118,7 @@
       ctx.save();
       boxPath(ctx);
       ctx.clip();
-      drawRays(t);
+      if (!opt.hide.includes('rays')) drawRays(t);
       ctx.restore();
     }
     drawSurface(t);
@@ -1072,8 +1156,8 @@
       const x = X0 + ((i + 0.5) / 5) * TW + Math.sin(t * 0.2 + i * 1.7) * 80 * S;
       const w = (60 + 40 * Math.sin(t * 0.3 + i)) * S * Math.min(1, TW / 800);
       const g = ctx.createLinearGradient(0, surfaceY, 0, floorY);
-      g.addColorStop(0, 'rgba(160,220,255,0.10)');
-      g.addColorStop(1, 'rgba(160,220,255,0)');
+      g.addColorStop(0, `rgba(${opt.theme.ray},${opt.theme.rayA})`);
+      g.addColorStop(1, `rgba(${opt.theme.ray},0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(x - w * 0.5, surfaceY);
@@ -1086,7 +1170,7 @@
   }
 
   function drawSurface(t) {
-    if (opt.bg !== 'tank' && opt.top === 0) return;
+    if ((opt.bg !== 'tank' && opt.top === 0) || opt.hide.includes('surface')) return;
     ctx.save();
     ctx.strokeStyle = 'rgba(200,240,255,0.55)';
     ctx.lineWidth = 2 * S;
@@ -1245,15 +1329,207 @@
     if (f.species === 'jelly') {
       ctx.rotate(f.spin);
       drawJelly(L, c, t, f);
+      if (f.pattern) drawPattern(f, L, c);
+      if (f.wear) drawWear(f, L, t);
     } else {
       ctx.scale(f.face, 1);
       ctx.rotate(f.pitch + f.spin);
       const sw = Math.sin(f.tail) * L * 0.09;
       if (spec(f.species).custom) drawSkinImage(L, f);
       else ({ goldfish: drawGoldfish, clown: drawClown, puffer: drawPuffer, angel: drawAngel, shark: drawShark, whale: drawWhale, narwhal: drawNarwhal, koi: drawKoi })[f.species](L, c, sw, f);
+      if (f.pattern) drawPattern(f, L, c);
+      if (f.wear) drawWear(f, L, t);
     }
     ctx.restore();
     if (f.avatar) drawAvatar(f, L);
+  }
+
+  // 魚身的大致形狀（花紋只畫在這裡面）與頭頂、眼睛的位置（配件放這裡），都用身長 L 的倍數
+  const BODY = {
+    goldfish: { rx: 0.42, ry: 0.26, head: [0.16, -0.24], eye: [0.24, -0.06] },
+    clown: { rx: 0.42, ry: 0.24, head: [0.18, -0.22], eye: [0.3, -0.05] },
+    puffer: { rx: 0.3, ry: 0.3, head: [0.1, -0.29], eye: [0.15, -0.09] },
+    angel: { rx: 0.33, ry: 0.27, head: [0.24, -0.16], eye: [0.26, -0.05] },
+    shark: { rx: 0.45, ry: 0.13, head: [0.3, -0.13], eye: [0.36, -0.04] },
+    whale: { rx: 0.48, ry: 0.18, head: [0.3, -0.18], eye: [0.32, 0.03] },
+    narwhal: { rx: 0.46, ry: 0.15, head: [0.3, -0.14], eye: [0.32, -0.01] },
+    koi: { rx: 0.46, ry: 0.18, head: [0.26, -0.16], eye: [0.3, -0.04] },
+    jelly: { rx: 0.3, ry: 0.26, head: [0, -0.28], eye: [0.1, -0.1], dome: true },
+  };
+  function bodyOf(f, L) {
+    let b = BODY[f.species];
+    if (!b) { // 自訂魚種：用圖片的長寬比
+      const im = image(spec(f.species).url);
+      const h = im ? (im.naturalHeight / im.naturalWidth) * 0.5 : 0.3;
+      b = { rx: 0.42, ry: h * 0.8, head: [0.18, -h * 0.9], eye: [0.3, -h * 0.2] };
+    }
+    const k = f.species === 'puffer' ? 1 + f.puff * 0.55 : 1;
+    return { rx: b.rx * L * k, ry: b.ry * L * k, hx: b.head[0] * L * k, hy: b.head[1] * L * k, ex: b.eye[0] * L * k, ey: b.eye[1] * L * k, dome: b.dome };
+  }
+
+  // 花紋：條紋、斑點、星星、愛心（只畫在魚身的後 2/3，不蓋到眼睛）
+  function drawPattern(f, L, c) {
+    const b = bodyOf(f, L);
+    const [r, g, bl] = c[0] === '#' ? hexRgb(c) : [200, 200, 200];
+    const ink = r * 0.3 + g * 0.59 + bl * 0.11 > 150 ? 'rgba(40,30,60,0.35)' : 'rgba(255,255,255,0.55)';
+    ctx.save();
+    ctx.beginPath();
+    if (b.dome) ctx.ellipse(0, 0, b.rx, b.ry, 0, Math.PI, 0);
+    else ctx.ellipse(0, 0, b.rx * 0.96, b.ry * 0.92, 0, 0, TAU);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.rect(-b.rx * 1.2, -b.ry * 1.2, b.rx * (b.dome ? 2.4 : 1.55), b.ry * 2.4);
+    ctx.clip();
+    ctx.fillStyle = ink;
+    const seed = f.hue;
+    const u = Math.max(L * 0.05, 2 * S);
+    if (f.pattern === 'stripes') {
+      for (let x = -b.rx; x < b.rx * 0.4; x += u * 3.2) ctx.fillRect(x, -b.ry * 1.2, u * 1.3, b.ry * 2.4);
+    } else {
+      for (let i = 0; i < 7; i++) {
+        const x = -b.rx * 0.85 + ((seed * (i + 3) * 37) % 100) / 100 * b.rx * 1.2;
+        const y = -b.ry * 0.7 + ((seed * (i + 7) * 53) % 100) / 100 * b.ry * 1.4;
+        const s = u * (0.8 + ((seed + i * 17) % 5) / 10);
+        ctx.beginPath();
+        if (f.pattern === 'spots') ctx.arc(x, y, s, 0, TAU);
+        else if (f.pattern === 'stars') starPath(x, y, s * 1.4, s * 0.6);
+        else heartPath(x, y, s * 1.2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  function starPath(x, y, ro, ri) {
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? ri : ro;
+      i ? ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r) : ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    ctx.closePath();
+  }
+  function heartPath(x, y, s) {
+    ctx.moveTo(x, y + s * 0.8);
+    ctx.bezierCurveTo(x - s * 1.4, y - s * 0.2, x - s * 0.6, y - s * 1.2, x, y - s * 0.4);
+    ctx.bezierCurveTo(x + s * 0.6, y - s * 1.2, x + s * 1.4, y - s * 0.2, x, y + s * 0.8);
+  }
+
+  // 配件：畫在魚的座標裡（跟著魚轉向、傾斜）
+  function drawWear(f, L, t) {
+    const b = bodyOf(f, L);
+    const u = clamp(L * 0.2, 7 * S, 30 * S);
+    const x = b.hx, y = b.hy;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    switch (f.wear) {
+      case 'hat': // 禮帽
+        ctx.fillStyle = '#22222a';
+        ctx.fillRect(x - u * 0.45, y - u * 1.0, u * 0.9, u * 0.95);
+        ctx.fillStyle = '#c0304a';
+        ctx.fillRect(x - u * 0.45, y - u * 0.3, u * 0.9, u * 0.2);
+        ctx.fillStyle = '#22222a';
+        ctx.beginPath();
+        ctx.ellipse(x, y, u * 0.8, u * 0.16, 0, 0, TAU);
+        ctx.fill();
+        break;
+      case 'crown':
+        ctx.fillStyle = '#ffcf3a';
+        ctx.strokeStyle = '#c99400';
+        ctx.lineWidth = Math.max(1, u * 0.06);
+        ctx.beginPath();
+        ctx.moveTo(x - u * 0.6, y + u * 0.05);
+        ctx.lineTo(x - u * 0.65, y - u * 0.6);
+        ctx.lineTo(x - u * 0.3, y - u * 0.3);
+        ctx.lineTo(x, y - u * 0.8);
+        ctx.lineTo(x + u * 0.3, y - u * 0.3);
+        ctx.lineTo(x + u * 0.65, y - u * 0.6);
+        ctx.lineTo(x + u * 0.6, y + u * 0.05);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#e8435a';
+        for (const dx of [-0.32, 0, 0.32]) { ctx.beginPath(); ctx.arc(x + dx * u, y - u * 0.12, u * 0.09, 0, TAU); ctx.fill(); }
+        break;
+      case 'glasses': // 墨鏡：一片鏡片蓋在眼睛上，鏡腳往後
+        ctx.fillStyle = 'rgba(20,20,30,0.92)';
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = Math.max(1.2, u * 0.1);
+        ctx.beginPath();
+        ctx.roundRect(b.ex - u * 0.32, b.ey - u * 0.22, u * 0.64, u * 0.44, u * 0.16);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(b.ex - u * 0.32, b.ey - u * 0.08);
+        ctx.lineTo(b.ex - u * 0.95, b.ey - u * 0.2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillRect(b.ex - u * 0.18, b.ey - u * 0.14, u * 0.12, u * 0.12);
+        break;
+      case 'bow':
+        ctx.fillStyle = '#ff6fae';
+        ctx.beginPath();
+        ctx.moveTo(x - u * 0.15, y - u * 0.15);
+        ctx.lineTo(x - u * 0.7, y - u * 0.5);
+        ctx.lineTo(x - u * 0.7, y + u * 0.15);
+        ctx.closePath();
+        ctx.moveTo(x - u * 0.15, y - u * 0.15);
+        ctx.lineTo(x + u * 0.4, y - u * 0.5);
+        ctx.lineTo(x + u * 0.4, y + u * 0.15);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#e0408a';
+        ctx.beginPath();
+        ctx.arc(x - u * 0.15, y - u * 0.17, u * 0.16, 0, TAU);
+        ctx.fill();
+        break;
+      case 'pirate':
+        ctx.fillStyle = '#1d1d22';
+        ctx.beginPath();
+        ctx.moveTo(x - u * 0.9, y + u * 0.05);
+        ctx.quadraticCurveTo(x - u * 0.6, y - u * 0.9, x, y - u * 0.75);
+        ctx.quadraticCurveTo(x + u * 0.6, y - u * 0.9, x + u * 0.9, y + u * 0.05);
+        ctx.quadraticCurveTo(x, y - u * 0.2, x - u * 0.9, y + u * 0.05);
+        ctx.fill();
+        ctx.fillStyle = '#f2f2f2';
+        ctx.beginPath();
+        ctx.arc(x, y - u * 0.42, u * 0.13, 0, TAU);
+        ctx.fill();
+        ctx.fillRect(x - u * 0.16, y - u * 0.3, u * 0.32, u * 0.05);
+        break;
+      case 'flower':
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * TAU - Math.PI / 2;
+          ctx.fillStyle = i % 2 ? '#ff8ac0' : '#ffa8d0';
+          ctx.beginPath();
+          ctx.arc(x + Math.cos(a) * u * 0.3, y - u * 0.35 + Math.sin(a) * u * 0.3, u * 0.22, 0, TAU);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#ffd23f';
+        ctx.beginPath();
+        ctx.arc(x, y - u * 0.35, u * 0.16, 0, TAU);
+        ctx.fill();
+        break;
+      case 'headphones':
+        ctx.strokeStyle = '#2b2b38';
+        ctx.lineWidth = Math.max(2, u * 0.16);
+        ctx.beginPath();
+        ctx.arc(x - u * 0.15, y + u * 0.35, u * 0.6, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.stroke();
+        ctx.fillStyle = '#ff5a5a';
+        ctx.beginPath();
+        ctx.ellipse(b.ex - u * 0.55, b.ey, u * 0.22, u * 0.3, 0, 0, TAU);
+        ctx.fill();
+        break;
+      case 'halo': {
+        const fy = y - u * 0.55 + Math.sin(t * 3 + f.hue) * u * 0.08;
+        ctx.strokeStyle = '#ffe37a';
+        ctx.lineWidth = Math.max(2, u * 0.14);
+        ctx.shadowColor = '#fff3b0';
+        ctx.shadowBlur = 8 * S;
+        ctx.beginPath();
+        ctx.ellipse(x, fy, u * 0.5, u * 0.16, 0, 0, TAU);
+        ctx.stroke();
+        break;
+      }
+    }
+    ctx.restore();
   }
 
   // 自訂魚種：實況主上傳的圖（魚頭朝右），跟著尾巴節奏輕輕擺動、伸縮
@@ -1270,7 +1546,7 @@
   function drawAvatar(f, L) {
     const im = image(f.avatar.url);
     if (!im) return;
-    const r = clamp(Math.min(extent(f, TOP), extent(f, BOTTOM)) * 0.85, 8 * S, 40 * S);
+    const r = clamp(bodyOf(f, L).ry * 0.95, 8 * S, 40 * S); // 看魚身大小（不含神仙魚的長鰭）
     const x = f.x, y = f.species === 'jelly' ? f.y - L * 0.14 : f.y;
     ctx.save();
     ctx.globalAlpha = f.alpha;
@@ -1915,6 +2191,6 @@
       for (let i = 0; i < sec * 60; i++) { skew += 1000 / 60; now = performance.now() + skew; update(1 / 60); }
       draw();
     },
-    peek: () => ({ ev: ev && ev.type, food: food.length, foodOwners: food.map((p) => p.owner || '*'), schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
+    peek: () => ({ ev: ev && ev.type, food: food.length, foodOwners: food.map((p) => p.owner || '*'), seaweed: seaweed.length, pending: [...pending.keys()], schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
   };
 })();

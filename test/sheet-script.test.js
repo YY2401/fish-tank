@@ -51,29 +51,20 @@ test('存了再讀回來，同一個帳號會更新同一列，頭像也記得',
   assert.deepStrictEqual(post({ key: 'k1', action: 'list' }), { ok: true, profiles: {} });
   post({ key: 'k1', action: 'save', profiles: [{ login: 'Fan01', display: '粉絲', species: 'whale', color: 'rainbow', size: 1.2, unlocked: ['whale'] }] });
   post({ key: 'k1', action: 'save', profiles: [
-    { login: 'fan01', display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' } },
+    { login: 'fan01', display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }, wear: 'crown', pattern: 'spots', mine: 'https://i.example.com/me.png' },
     { login: 'b', species: 'clown', size: 1, unlocked: [] },
   ] });
   assert.strictEqual(rows.length, 3); // 標題 + 2 個人
   const j = post({ key: 'k1', action: 'list' });
-  assert.deepStrictEqual(j.profiles.fan01, { display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' } });
+  assert.deepStrictEqual(j.profiles.fan01, { display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }, wear: 'crown', pattern: 'spots', mine: 'https://i.example.com/me.png' });
   assert.strictEqual(j.profiles.b.species, 'clown');
   assert.strictEqual(j.profiles.b.avatar, null);
 });
 
-test('舊版試算表（少了頭像欄）會自動補上標題', () => {
+test('舊版試算表（少了後面幾欄）會自動補上標題；不再有上傳圖片', () => {
   const { post, rows } = load({ oldHeader: true });
   post({ key: 'k1', action: 'list' });
   assert.strictEqual(rows[0][7], '頭像');
-});
-
-test('上傳圖片：存到雲端硬碟並開放連結，回傳圖片網址；格式或大小不對會擋', () => {
-  const { post, files } = load();
-  const png = Buffer.from('fake-png').toString('base64');
-  const r = post({ key: 'k1', action: 'upload', name: '小雞.png', mime: 'image/png', data: png });
-  assert.deepStrictEqual(r, { ok: true, url: 'https://lh3.googleusercontent.com/d/f0' });
-  assert.strictEqual(files[0].sharing, 'link:view');
-  assert.strictEqual(post({ key: 'k1', action: 'upload', mime: 'text/html', data: png }).ok, false);
-  assert.strictEqual(post({ key: 'k1', action: 'upload', mime: 'image/png', data: '' }).ok, false);
-  assert.strictEqual(post({ key: 'x', action: 'upload', mime: 'image/png', data: png }).ok, false);
+  assert.strictEqual(rows[0][10], '個人魚圖片');
+  assert.deepStrictEqual(post({ key: 'k1', action: 'upload', mime: 'image/png', data: 'AAAA' }), { ok: false, error: '不認得的動作' });
 });

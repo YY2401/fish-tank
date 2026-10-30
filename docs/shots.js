@@ -2,6 +2,7 @@
 /* 產生教學圖文用的截圖：用真的 index.html / tank.html，Twitch 聊天室與 Google 試算表換成模擬。執行：node docs/shots.js */
 const path = require('node:path');
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const H = require('../test/e2e/helpers');
 
 const OUT = path.join(__dirname, 'img');
@@ -98,17 +99,24 @@ async function shotPage(page, name) {
   await shotRange(page, 'setup-area', 'label:has(#bg) > span', '.area', 14, 10);
   await page.click('[data-area="0,0,0,0"]');
 
-  await mark(page, ['#decos', '#event']);
-  await shotEl(page, 'setup-deco', leftSec(2));
+  await page.click('[data-theme="tropical"]');
+  await mark(page, ['#themes', '#layers']);
+  await shotRange(page, 'setup-look', `${leftSec(2)} h2`, 'label:has(#bgimg)');
+  await page.click('[data-theme="ocean"]');
 
+  await mark(page, ['#decos', '#event']);
+  await shotRange(page, 'setup-deco', '#decoLbl', 'label:has(#event)');
+
+  // 上傳一張圖（示範用的小雞），會縮小後直接放進網址
   await page.type('#skinName', '小雞');
-  await page.type('#skinUrl', CHICK);
-  await page.click('#skinAdd');
+  await (await page.$('#skinFile')).uploadFile(path.join(__dirname, 'samples', 'chick.svg'));
   await page.waitForFunction(() => { const i = document.querySelector('#skins img'); return i && i.naturalWidth; });
-  await mark(page, ['#skins .skin', '.skin-add']);
+  await mark(page, ['#skins .skin', '.skin-add label']);
   await shotRange(page, 'setup-skins', `${leftSec(3)} h2`, '#skinMsg', 14, 1);
   await mark(page, ['#pfp']);
   await shotRange(page, 'setup-avatar', '#avatarLbl', 'label:has(#pfp)');
+  await mark(page, ['label:has(#submit)']);
+  await shotRange(page, 'setup-viewer', '#wearLbl', 'label:has(#submit)');
 
   await page.waitForFunction(() => /正在偵測/.test(document.getElementById('listenText').textContent));
   await page.evaluate(() => window.__twitch.say('@custom-reward-id=8f2c41d0-6a1e-4b8e-9c55-2d7f0e3a9b12;display-name=小魚乾 :fish01!fish01@fish01.tmi.twitch.tv PRIVMSG #yy2401 :鯨魚'));
@@ -117,6 +125,7 @@ async function shotPage(page, name) {
   await mark(page, ['#rewards .reward']);
   await shotRange(page, 'setup-rare', `${leftSec(4)} .lbl`, '#rewards');
 
+  await page.click('#advanced summary'); // 試算表收在「進階」裡
   await mark(page, ['#copyScript']);
   await shotRange(page, 'setup-sheet-copy', `${leftSec(5)} ol li:nth-child(1)`, `${leftSec(5)} ol li:nth-child(2)`, 10, 6);
   await page.type('#store', STORE);
@@ -218,6 +227,44 @@ async function shotPage(page, name) {
   });
   await tank.screenshot({ path: path.join(OUT, 'tank-custom.png'), clip: box });
   console.log('shot tank-custom');
+
+  // 觀眾打扮：配件與花紋
+  await openTank('deco=coral&tip=0&weed=1&scale=1.6');
+  await tank.evaluate(() => {
+    const looks = [['小魚乾', '!金魚', '帽子', '條紋'], ['阿宅不睡覺', '!小丑魚', '皇冠', ''], ['Momo_TW', '!河豚', '眼鏡', '斑點'], ['路過的貓', '!神仙魚', '蝴蝶結', '愛心'],
+      ['kiwi_kiwi', '!鯊魚', '海盜帽', ''], ['布丁狗', '!水母', '花', '星星'], ['大吉大利', '!金魚', '耳機', '斑點'], ['SunnyDay', '!小丑魚', '光環', '']];
+    looks.forEach(([name, sp, wear, pat], i) => {
+      const say = (t) => FishTank.handleChat({ login: 'w' + i, display: name, text: t, badges: {} });
+      say('!魚'); say(sp); say('!戴 ' + wear); if (pat) say('!花紋 ' + pat);
+    });
+  });
+  await tank.evaluate(() => FishTank.advance(10));
+  await sleep(500);
+  const wbox = await tank.evaluate(() => {
+    const fs = [...FishTank.fishes.values()];
+    const xs = fs.map((f) => f.x), ys = fs.map((f) => f.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const w = 860, h = 480;
+    return { x: Math.max(0, Math.min(innerWidth - w, cx - w / 2)), y: Math.max(0, Math.min(innerHeight - h, cy - h / 2)), width: w, height: h };
+  });
+  await tank.screenshot({ path: path.join(OUT, 'tank-wear.png'), clip: wbox });
+  console.log('shot tank-wear');
+
+  // 配色主題：四種排成 2×2 一張圖
+  const tmp = [];
+  for (const th of ['tropical', 'deep', 'sunset', 'candy']) {
+    await openTank(`theme=${th}&deco=castle,coral&tip=0`);
+    await fill(8);
+    await tank.evaluate(() => FishTank.advance(8));
+    await sleep(300);
+    const f = path.join(OUT, `_theme-${th}.png`);
+    await tank.screenshot({ path: f });
+    tmp.push(f);
+  }
+  const ff = process.env.FFMPEG_PATH || 'ffmpeg';
+  execFileSync(ff, ['-y', '-loglevel', 'error', ...tmp.flatMap((f) => ['-i', f]), '-filter_complex', '[0][1]hstack[a];[2][3]hstack[b];[a][b]vstack,scale=1920:-1', path.join(OUT, 'tank-themes.png')]);
+  tmp.forEach((f) => fs.unlinkSync(f));
+  console.log('shot tank-themes');
 
   // 角落魚缸疊在遊戲畫面上（背景用一張示意的遊戲畫面）
   await openTank('deco=castle,coral,bubbler&top=0.5&bottom=0.03&left=0.55&right=0.02&tip=1');

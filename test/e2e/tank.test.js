@@ -322,4 +322,92 @@ if (!H.chromePath()) {
     assert.match((await fish(page, 'carl')).say, /小雞/, '可以變的清單要列出自訂魚種');
     assert.deepEqual(page.errors, []);
   });
+
+  test('魚缸外觀：配色主題與自訂顏色畫出來的海水顏色對、元素可以關掉', async (t) => {
+    const waterAt = (page) => page.evaluate(() => {
+      const { area } = FishTank.peek();
+      const c = document.getElementById('tank');
+      const k = c.width / innerWidth;
+      const y = Math.round(((area.surfaceY + area.floorY) / 2) * k);
+      return [...c.getContext('2d').getImageData(Math.round(30 * k), y, 1, 1).data].slice(0, 3);
+    });
+    const near = (a, hex, tol = 40) => {
+      const n = parseInt(hex.slice(1), 16);
+      return Math.abs(a[0] - (n >> 16)) + Math.abs(a[1] - ((n >> 8) & 255)) + Math.abs(a[2] - (n & 255)) < tol * 3;
+    };
+    let page = await open(t, '&hide=rays,bubbles,surface,rocks,sand&weed=0&deco=');
+    await advance(page, 0.1);
+    assert.ok(near(await waterAt(page), '#0f5582'), '預設是海洋的藍色');
+    assert.equal((await peek(page)).seaweed, 0, 'weed=0 沒有海草');
+
+    page = await open(t, '&theme=sunset&hide=rays,bubbles&weed=0&deco=');
+    await advance(page, 0.1);
+    const sunset = await waterAt(page);
+    assert.ok(near(sunset, '#c45a8a', 60), `夕陽主題的海水要偏紫紅，實際 ${sunset}`);
+
+    page = await open(t, '&water=%23ff0000,%23ff0000&hide=rays,bubbles&weed=3&deco=');
+    await advance(page, 0.1);
+    assert.ok(near(await waterAt(page), '#ff0000'), '自訂顏色');
+    assert.ok((await peek(page)).seaweed > 20, 'weed=3 海草很多');
+  });
+
+  test('觀眾打扮：!戴 配件、!花紋，可以拿掉，重新整理後還記得', async (t) => {
+    const page = await open(t);
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!戴 皇冠');
+    await chat(page, 'amy', '!花紋 星星');
+    let f = await page.evaluate(() => { const f = FishTank.fishes.get('amy'); return { wear: f.wear, pattern: f.pattern }; });
+    assert.deepEqual(f, { wear: 'crown', pattern: 'stars' });
+    await advance(page, 4);
+    await chat(page, 'amy', '!戴 不存在的東西');
+    assert.match((await fish(page, 'amy')).say, /皇冠/);
+    for (const w of ['帽子', '眼鏡', '蝴蝶結', '海盜帽', '花', '耳機', '光環']) { await advance(page, 4); await chat(page, 'amy', '!戴 ' + w); await advance(page, 0.1); }
+    for (const w of ['條紋', '斑點', '愛心']) { await advance(page, 4); await chat(page, 'amy', '!花紋 ' + w); await advance(page, 0.1); }
+    assert.deepEqual(page.errors, [], '每種配件、花紋都畫得出來');
+    await H.sleep(800);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.FishTank);
+    await chat(page, 'amy', '我回來了');
+    f = await page.evaluate(() => { const f = FishTank.fishes.get('amy'); return { wear: f.wear, pattern: f.pattern }; });
+    assert.deepEqual(f, { wear: 'halo', pattern: 'hearts' });
+    await chat(page, 'amy', '!戴 關');
+    assert.equal(await page.evaluate(() => FishTank.fishes.get('amy').wear), null);
+  });
+
+  test('觀眾提交自己的魚：要管理員 !tank ok 才出現，!tank no 退回，一般觀眾不能核准', async (t) => {
+    const page = await open(t, '', { routes: { 'https://img.example.com/': {} } });
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!我的魚 https://img.example.com/amy.png');
+    assert.deepEqual((await peek(page)).pending, ['amy']);
+    assert.notEqual((await fish(page, 'amy')).species, 'u:amy', '還沒核准不能出現');
+    await chat(page, 'bob', '!tank ok @amy'); // 一般觀眾
+    assert.deepEqual((await peek(page)).pending, ['amy']);
+    await chat(page, 'mod1', '!tank ok @amy', { badges: { mod: true } });
+    assert.deepEqual((await peek(page)).pending, []);
+    assert.equal((await fish(page, 'amy')).species, 'u:amy');
+    await chat(page, 'carl', '!變 u:amy');
+    assert.notEqual((await fish(page, 'carl')).species, 'u:amy', '別人不能用 amy 的魚');
+
+    await chat(page, 'dan', '!魚');
+    await chat(page, 'dan', '!我的魚 https://img.example.com/bad.png');
+    await chat(page, 'boss', '!tank no @dan', { badges: { broadcaster: true } });
+    assert.deepEqual((await peek(page)).pending, []);
+    assert.match((await fish(page, 'dan')).say, /沒有通過/);
+
+    await H.sleep(800);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.FishTank);
+    await chat(page, 'amy', '我回來了');
+    assert.equal((await fish(page, 'amy')).species, 'u:amy', '核准過的魚重新整理後還在');
+    await chat(page, 'amy', '!我的魚 關');
+    assert.notEqual((await fish(page, 'amy')).species, 'u:amy');
+  });
+
+  test('實況主關掉提交時，!我的魚 會說明沒開放', async (t) => {
+    const page = await open(t, '&submit=0');
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!我的魚 https://img.example.com/amy.png');
+    assert.deepEqual((await peek(page)).pending, []);
+    assert.match((await fish(page, 'amy')).say, /沒有開放/);
+  });
 }

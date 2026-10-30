@@ -51,6 +51,9 @@
     follow: ['follow', '跟', '跟隨'],
     hug: ['hug', '抱', '抱抱', 'kiss', '親'],
     avatar: ['avatar', '頭像', '臉', 'face'],
+    wear: ['wear', '戴', '配件', '穿'],
+    pattern: ['pattern', '花紋', '圖案'],
+    mine: ['myfish', '我的魚', '我的圖'],
     help: ['fishhelp', '魚說明', '水族箱'],
     tank: ['tank'], // 實況主／管理員專用：!tank clear、!tank feed、!tank shark…
   };
@@ -60,12 +63,77 @@
   for (const [id, sp] of Object.entries(SPECIES)) for (const a of sp.aliases) if (!ALIAS[a.toLowerCase()]) ALIAS[a.toLowerCase()] = 'skin:' + id;
 
   // 各指令的個人冷卻（毫秒）
-  const COOLDOWN = { jump: 4000, dash: 3000, spin: 4000, bubble: 3000, feed: 15000, hug: 8000, skin: 5000, color: 3000, help: 30000 };
+  // 配件（戴在魚頭上）與花紋（畫在魚身上）：全部用程式畫，不用圖片
+  const WEARS = {
+    hat: { name: '帽子', aliases: ['帽子', '禮帽', 'hat'] },
+    crown: { name: '皇冠', aliases: ['皇冠', '王冠', 'crown'] },
+    glasses: { name: '眼鏡', aliases: ['眼鏡', '墨鏡', 'glasses'] },
+    bow: { name: '蝴蝶結', aliases: ['蝴蝶結', '緞帶', 'bow'] },
+    pirate: { name: '海盜帽', aliases: ['海盜帽', '海盜', 'pirate'] },
+    flower: { name: '花', aliases: ['花', '小花', 'flower'] },
+    headphones: { name: '耳機', aliases: ['耳機', 'headphones'] },
+    halo: { name: '光環', aliases: ['光環', '天使', 'halo'] },
+  };
+  const PATTERNS = {
+    stripes: { name: '條紋', aliases: ['條紋', '斑馬', 'stripes'] },
+    spots: { name: '斑點', aliases: ['斑點', '點點', 'spots', 'dots'] },
+    stars: { name: '星星', aliases: ['星星', 'stars'] },
+    hearts: { name: '愛心', aliases: ['愛心', 'hearts'] },
+  };
+  const OFF = ['關', '關掉', '取消', '拿掉', '不要', 'off', 'none'];
+  // 「帽子」「crown」→ ID；「關」→ ''；不認得 → null
+  function findIn(table, word) {
+    const w = String(word || '').trim().toLowerCase();
+    if (OFF.includes(w)) return '';
+    for (const [id, it] of Object.entries(table)) if (id === w || it.aliases.some((a) => a.toLowerCase() === w)) return id;
+    return null;
+  }
+  const findWear = (w) => findIn(WEARS, w);
+  const findPattern = (w) => findIn(PATTERNS, w);
+
+  // 圖片網址：https，或設定頁縮小後直接放進網址的圖（data:image/…;base64）
+  const IMAGE_URL = /^(https:\/\/\S+|data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+)$/;
+
+  const COOLDOWN = { jump: 4000, dash: 3000, spin: 4000, bubble: 3000, feed: 15000, hug: 8000, skin: 5000, color: 3000, help: 30000, wear: 3000, pattern: 3000, mine: 60000 };
 
   // 大事件與忠誠點品項可以觸發的動作
   const EVENTS = { shark: '鯊魚出沒', whirl: '大漩渦', treasure: '寶箱掉落', school: '魚群' };
   const REWARD_ACTIONS = { rare: '解鎖稀有魚種', shark: '鯊魚出沒', whirl: '大漩渦', treasure: '寶箱掉落', feed: '全場撒飼料' };
   const DECOS = { castle: '城堡', chest: '寶箱', coral: '珊瑚', bubbler: '打氣石' };
+
+  // 魚缸配色：水面上方（空氣）、海水由淺到深三段、沙子上下、石頭上下、海草顏色、光線顏色
+  const THEMES = {
+    ocean: { name: '海洋', air: ['#0b1622', '#14324a'], water: ['#1d7fb0', '#0f5582', '#07304f'], sand: ['#d8bf86', '#8f744a'], rock: ['#6d7a86', '#2f3942'], weed: ['#2f8a4f', '#3c9a5c', '#c4506a'], ray: '160,220,255', rayA: 0.1 },
+    tropical: { name: '熱帶淺海', air: ['#7fd8f5', '#b8eefc'], water: ['#3fd0d4', '#1aa3b8', '#0b6b85'], sand: ['#f3e2b0', '#c9a96b'], rock: ['#9a8f7f', '#5a5245'], weed: ['#3cc46a', '#7be08a', '#ff7aa8'], ray: '255,255,220', rayA: 0.14 },
+    deep: { name: '深海', air: ['#02060f', '#061225'], water: ['#0b2a52', '#06173a', '#020814'], sand: ['#3a3f52', '#1d2030'], rock: ['#2b3346', '#10141f'], weed: ['#1f6f6a', '#2a8a7e', '#5a3a9a'], ray: '120,180,255', rayA: 0.05 },
+    sunset: { name: '夕陽', air: ['#ff9f5a', '#ffc58a'], water: ['#ff9a6b', '#c45a8a', '#4a2a6a'], sand: ['#e8b98a', '#9a6a5a'], rock: ['#8a6a7a', '#4a3040'], weed: ['#4aa06a', '#d06a8a', '#f0a050'], ray: '255,220,180', rayA: 0.12 },
+    night: { name: '夜晚', air: ['#05081a', '#101a3a'], water: ['#1b3a6a', '#0f2246', '#060f24'], sand: ['#5a5a70', '#2a2a3a'], rock: ['#3a4058', '#161a28'], weed: ['#2f6a5a', '#3a7a6a', '#6a4a9a'], ray: '200,220,255', rayA: 0.05 },
+    candy: { name: '夢幻粉', air: ['#ffe0f0', '#ffc8e4'], water: ['#ffb3d9', '#c79bff', '#8a6bff'], sand: ['#fff0f5', '#f0c0d8'], rock: ['#d8a8d0', '#9a70a8'], weed: ['#7be0c0', '#ff8ac0', '#ffd36b'], ray: '255,255,255', rayA: 0.15 },
+    lake: { name: '湖泊', air: ['#a8d0e8', '#cfe6f2'], water: ['#5aa86a', '#2f7a55', '#173f30'], sand: ['#8a7a5a', '#4a3f2a'], rock: ['#6a6a5a', '#33332a'], weed: ['#4a9a3a', '#6ab04a', '#2f7a3a'], ray: '220,255,200', rayA: 0.08 },
+  };
+  // 可以關掉的畫面元素（裝飾另外勾）
+  const LAYERS = { rays: '光線', rocks: '石頭', sand: '沙地', bubbles: '背景氣泡', surface: '水面線' };
+
+  // 「#hex」→ 合法的六碼色，不合法回傳 null
+  const hex6 = (v) => (/^#?[0-9a-f]{6}$/i.test(String(v || '').trim()) ? '#' + String(v).trim().replace('#', '').toLowerCase() : null);
+
+  // 兩個顏色中間的顏色（t = 0～1）
+  function mixHex(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ch = (sh) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * t);
+    return '#' + [16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, '0')).join('');
+  }
+
+  // 網址參數 → 背景配色：主題，再套上自訂的水色（淺,深）和沙色
+  function resolveTheme(id, water, sand) {
+    const base = THEMES[id] || THEMES.ocean;
+    const t = { ...base, water: base.water.slice(), sand: base.sand.slice() };
+    const [top, bottom] = String(water || '').split(',').map(hex6);
+    if (top && bottom) t.water = [top, mixHex(top, bottom, 0.5), bottom];
+    const sd = hex6(sand);
+    if (sd) t.sand = [sd, mixHex(sd, '#000000', 0.35)];
+    return t;
+  }
 
   // 「品項ID:動作,品項ID:動作」↔ { 品項ID: 動作 }
   function parseRewards(str) {
@@ -145,7 +213,7 @@
       if (i < 1) continue;
       const name = raw.slice(0, i).trim().replace(/^[!！]/, '').slice(0, 12);
       const url = raw.slice(i + 1).trim();
-      if (!name || !/^https:\/\//.test(url) || out.some((k) => k.name === name)) continue;
+      if (!name || !IMAGE_URL.test(url) || out.some((k) => k.name === name)) continue;
       out.push({ id: 'c:' + name, name, url });
     }
     return out;
@@ -255,6 +323,8 @@
     store: '', // Google 試算表（Apps Script 網頁應用程式）網址，換電腦也記得每隻魚
     skey: '', // 試算表暗號
     pfp: true, // 觀眾可以用 !頭像 大頭貼 把 Twitch 大頭貼放到魚身上
+    weed: 1, // 海草多寡：0 沒有、1 一般（原本的量）、2 多、3 很多
+    submit: true, // 觀眾可以用 !我的魚 圖片網址 提交自己的魚，管理員 !tank ok @名字 核准後才顯示
   };
   function readOptions(search) {
     const p = new URLSearchParams(search || '');
@@ -284,6 +354,12 @@
       skey: p.get('skey') || '',
       skins: parseSkins(p.getAll('skin')),
       pfp: bool('pfp'),
+      theme: resolveTheme(p.get('theme'), p.get('water'), p.get('sand')),
+      themeId: THEMES[p.get('theme')] ? p.get('theme') : 'ocean',
+      hide: (p.get('hide') || '').split(',').map((x) => x.trim()).filter((x) => LAYERS[x]),
+      weed: Math.round(num('weed', 0, 3)),
+      bgimg: /^https:\/\//.test(p.get('bgimg') || '') ? p.get('bgimg') : '',
+      submit: bool('submit'),
     };
   }
 
@@ -298,5 +374,5 @@
     return common[hashStr(login) % common.length];
   }
 
-  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
+  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, THEMES, LAYERS, resolveTheme, mixHex, hex6, WEARS, PATTERNS, findWear, findPattern, IMAGE_URL, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
 });
