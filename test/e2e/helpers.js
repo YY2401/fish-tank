@@ -77,4 +77,4 @@ async function newPage(browser, { width = 1280, height = 720, twitch = false, sh
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { chromePath, serve, launch, newPage, sleep };
+module.exports = { chromePath, serve, launch, newPage, sleep, FAKE_TWITCH };

@@ -1741,7 +1741,10 @@
         }, Math.max(150, 1400 / Math.ceil(bots / 8)));
       }
     });
-    el.querySelector('[data-act=hide]').addEventListener('click', () => el.classList.toggle('mini'));
+    const hideBtn = el.querySelector('[data-act=hide]');
+    const syncBtn = () => { hideBtn.textContent = el.classList.contains('mini') ? '＋' : '－'; };
+    hideBtn.addEventListener('click', () => { el.classList.toggle('mini'); syncBtn(); });
+    syncBtn();
   }
 
   // ───────── 啟動 ─────────

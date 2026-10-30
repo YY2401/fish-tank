@@ -5,6 +5,8 @@
 
 **👉 線上使用：<https://yy2401.github.io/fish-tank/>**（打開設定頁 → 填頻道 → 複製 OBS 網址）
 
+**📘 教學圖文**：[快速上手](docs/直播水族箱_快速上手_20261031.png)・[觀眾指令（可以放在直播畫面或頻道介紹）](docs/直播水族箱_觀眾指令_20261031.png)・[完整使用說明書 PDF](docs/直播水族箱_使用說明書_20261031.pdf)
+
 ## 檔案
 
 | 檔案 | 用途 |
@@ -62,6 +64,8 @@
 ## 開發
 
 ```bash
-npm start   # http://localhost:3010
-npm test    # 核心邏輯 + Apps Script（假試算表）
+npm start          # http://localhost:3010
+npm test           # 單元測試：核心邏輯 + Apps Script（假試算表）
+npm run test:e2e   # 瀏覽器測試：真的 Chrome 開水族箱與設定頁（Twitch、試算表用模擬）
+node docs/shots.js # 重新產生教學用截圖（docs/img）
 ```
