@@ -34,6 +34,9 @@
         },
         {
           "wait": 1500
+        },
+        {
+          "scroll": "#idle"
         }
       ],
       "duration": 5.5
