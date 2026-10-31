@@ -1,6 +1,6 @@
 {
   "title": "直播水族箱 設定教學",
-  "subtitle": "約 1 分鐘：設定頁 → OBS，觀眾就能變成魚",
+  "subtitle": "約 1 分鐘：從設定頁到 OBS，觀眾就能變成魚",
   "baseUrl": "https://yy2401.github.io/fish-tank/",
   "viewport": [
     1280,
@@ -96,7 +96,7 @@
     },
     {
       "goto": "docs/video/slide.html?img=1-sources.jpg&box=212,900,26,22",
-      "caption": "打開 OBS，在下方「來源」區塊按「＋」",
+      "caption": "打開 OBS，在下方「來源」區塊按加號按鈕",
       "highlight": "#hl"
     },
     {
@@ -106,7 +106,7 @@
     },
     {
       "goto": "docs/video/slide.html?img=3-new.jpg&box=345,115,1011,76",
-      "caption": "按「＋ 建立新來源」（舊版 OBS 會先問名稱：填「水族箱」，按確定）",
+      "caption": "按「建立新來源」（舊版 OBS 會先問名稱：填「水族箱」，按確定）",
       "highlight": "#hl",
       "duration": 5.5
     },

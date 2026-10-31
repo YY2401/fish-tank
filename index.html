@@ -96,7 +96,7 @@
 </head>
 <body>
 <main>
-  <h1>🐠 直播水族箱 <small>觀眾在聊天室打指令，就會變成魚在你的直播畫面裡游泳</small></h1>
+  <h1>直播水族箱 <small>觀眾在聊天室打指令，就會變成魚在你的直播畫面裡游泳</small></h1>
 
   <div class="left">
     <section>
@@ -180,9 +180,9 @@
       <summary>進階（選用）：換電腦也記得每隻魚</summary>
       <em style="margin:10px 0">大部分人不需要這個：觀眾的魚（魚種、顏色、配件、長大的大小）平常就記在 OBS 裡，同一台電腦開台都還在。只有<b>要換電腦或重灌 OBS</b> 時才需要接 Google 試算表；設定要進 Google Apps Script，比較麻煩。</em>
       <ol>
-        <li>開一份新的 Google 試算表 → 擴充功能 → Apps Script</li>
-        <li><button class="ghost" id="copyScript">複製程式碼</button> 整段貼上（取代原本內容）→ 儲存</li>
-        <li>部署 → 新增部署作業 → 類型「網頁應用程式」，執行身分「我」、存取權「所有人」→ 部署（第一次會要求授權）</li>
+        <li>開一份新的 Google 試算表，上方選「擴充功能」裡的「Apps Script」</li>
+        <li><button class="ghost" id="copyScript">複製程式碼</button> 整段貼上（取代原本內容）後儲存</li>
+        <li>按「部署」的「新增部署作業」，類型選「網頁應用程式」，執行身分「我」、存取權「所有人」，再按「部署」（第一次會要求授權）</li>
         <li>把網頁應用程式網址貼到這裡：</li>
       </ol>
       <div class="url"><input type="text" id="store" placeholder="https://script.google.com/macros/s/…/exec"><button class="ghost" id="testStore">測試連線</button></div>
@@ -197,10 +197,10 @@
       <h2>5. 複製到 OBS</h2>
       <div class="url"><input type="text" id="url" readonly><button id="copy">複製</button></div>
       <div class="msg" id="urlMsg"></div>
-      <p style="color:var(--muted);margin:8px 0 0;font-size:13px">OBS → 來源 → ＋ → 瀏覽器 → 貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。改了上面任何設定都要重新複製。</p>
+      <p style="color:var(--muted);margin:8px 0 0;font-size:13px">到 OBS 的「來源」按加號，選「瀏覽器」，貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。改了上面任何設定都要重新複製。</p>
     </section>
     <section>
-      <h2>預覽（按左上角「測試聊天室」展開，可以模擬打指令、訂閱、大事件）</h2>
+      <h2>預覽（按左上角「測試聊天室」的「展開」，可以模擬打指令、訂閱、大事件）</h2>
       <iframe id="preview" class="preview" title="水族箱預覽"></iframe>
     </section>
     <section id="objEditor">
@@ -448,7 +448,7 @@
   }
   const up = document.createElement('label');
   up.className = 'up';
-  up.innerHTML = '<b style="font-size:20px">＋</b>上傳圖片<input type="file" id="objFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>';
+  up.innerHTML = '上傳圖片<input type="file" id="objFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>';
   $('objPalette').append(up);
   function addObject(t) {
     if (state.objs.length >= 40) return;
@@ -531,7 +531,7 @@
       const row = document.createElement('div');
       row.className = 'reward';
       const opts = ['<option value="">不做事</option>', ...Object.entries(C.REWARD_ACTIONS).map(([k, v]) => `<option value="${k}"${state.rewards[id] === k ? ' selected' : ''}>${v}</option>`)].join('');
-      row.innerHTML = `<div><b></b><small>${id}</small></div><select>${opts}</select><button class="ghost" title="移除">✕</button>`;
+      row.innerHTML = `<div><b></b><small>${id}</small></div><select>${opts}</select><button class="ghost">移除</button>`;
       row.querySelector('b').textContent = seen ? `${seen.by}：「${seen.text}」` : '（之前設定的品項）';
       row.querySelector('select').addEventListener('change', (e) => {
         if (e.target.value) state.rewards[id] = e.target.value; else delete state.rewards[id];
@@ -549,9 +549,9 @@
     state.skins.forEach((k, i) => {
       const row = document.createElement('div');
       row.className = 'skin';
-      row.innerHTML = '<img alt=""><div><b></b><small></small></div><button class="ghost" title="移除">✕</button>';
+      row.innerHTML = '<img alt=""><div><b></b><small></small></div><button class="ghost">移除</button>';
       row.querySelector('img').src = k.url;
-      row.querySelector('img').onerror = () => { row.querySelector('small').textContent = '⚠ 圖片打不開，檢查網址'; };
+      row.querySelector('img').onerror = () => { row.querySelector('small').textContent = '圖片打不開，檢查網址'; };
       row.querySelector('b').textContent = '!' + k.name;
       row.querySelector('small').textContent = k.url.startsWith('data:') ? `上傳的圖（${Math.round(k.url.length / 1024)} KB）` : k.url;
       row.querySelector('button').addEventListener('click', () => { state.skins.splice(i, 1); refresh(); });
@@ -607,7 +607,7 @@
     try {
       if (!scriptSrc) { const r = await fetch('sheet-script.gs', { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); scriptSrc = await r.text(); }
       await navigator.clipboard.writeText(scriptSrc.replace('__KEY__', state.skey));
-      $('copyScript').textContent = '已複製 ✓';
+      $('copyScript').textContent = '已複製';
       setTimeout(() => ($('copyScript').textContent = '複製程式碼'), 1500);
     } catch (e) {
       $('storeMsg').className = 'msg bad';
@@ -625,7 +625,7 @@
       const j = await r.json();
       if (!j.ok) throw new Error(j.error === '暗號不對' ? '暗號不對：請重新複製程式碼、貼上、再部署一次「新版本」' : j.error);
       msg.className = 'msg ok';
-      msg.textContent = `✓ 連上了，試算表裡現在有 ${Object.keys(j.profiles || {}).length} 隻魚。記得重新複製 OBS 網址。`;
+      msg.textContent = `連上了，試算表裡現在有 ${Object.keys(j.profiles || {}).length} 隻魚。記得重新複製 OBS 網址。`;
     } catch (e) {
       msg.className = 'msg bad';
       msg.textContent = '連不上：' + (e.message === 'Failed to fetch' ? '存取權要選「所有人」，或網址不是 /exec 結尾' : e.message);

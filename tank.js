@@ -79,9 +79,9 @@
         n++;
       }
       try { localStorage.setItem(STORE, JSON.stringify(profiles)); } catch { /* 同上 */ }
-      status(`☁️ 從試算表讀到 ${n} 隻魚的外觀`);
+      status(`從試算表讀到 ${n} 隻魚的外觀`);
     } catch (e) {
-      status('☁️ 試算表連不上，先用這台記的外觀：' + (e.message === 'Failed to fetch' ? '請到設定頁按「測試連線」檢查' : e.message), true);
+      status('試算表連不上，先用這台記的外觀：' + (e.message === 'Failed to fetch' ? '請到設定頁按「測試連線」檢查' : e.message), true);
     }
   }
   async function cloudFlush() {
@@ -421,14 +421,14 @@
       f.size = Math.min(2, f.size + 0.2);
       poof(f);
       saveProfile(f);
-      banner(`🎉 ${f.display} ${reason}，稀有魚種都收集齊了，直接變大！`);
+      banner(`${f.display} ${reason}，稀有魚種都收集齊了，直接變大！`);
       return;
     }
     f.unlocked.push(id);
     f.species = id;
     poof(f);
     saveProfile(f);
-    banner(`🎉 ${f.display} ${reason}，解鎖稀有魚種「${C.SPECIES[id].name}」！`);
+    banner(`${f.display} ${reason}，解鎖稀有魚種「${C.SPECIES[id].name}」！`);
   }
 
   function ensureFish(msg) {
@@ -744,13 +744,13 @@
     if (type === 'shark') {
       const dir = Math.random() < 0.5 ? 1 : -1;
       ev = { type, t: 0, dir, x: dir > 0 ? X0 - 260 * S : X1 + 260 * S, y: rand(surfaceY + 120 * S, floorY - 120 * S), L: 230 * S, chomped: 0, tail: 0 };
-      banner(`🦈 鯊魚出沒！快逃！${who ? `（${who} 叫來的）` : ''}`);
+      banner(`鯊魚出沒！快逃！${who ? `（${who} 叫來的）` : ''}`);
     } else if (type === 'whirl') {
       ev = { type, t: 0, dur: 8, cx: X0 + TW / 2, cy: (surfaceY + floorY) / 2 };
-      banner(`🌀 大漩渦來了！${who ? `（${who} 攪的）` : ''}`);
+      banner(`大漩渦來了！${who ? `（${who} 攪的）` : ''}`);
     } else if (type === 'treasure') {
       ev = { type, t: 0, x: rx(0.15, 0.85), y: surfaceY - 20 * S, landed: false };
-      banner(`💰 寶箱掉下來了！第一隻碰到的魚解鎖稀有魚種！${who ? `（${who} 丟的）` : ''}`);
+      banner(`寶箱掉下來了！第一隻碰到的魚解鎖稀有魚種！${who ? `（${who} 丟的）` : ''}`);
     } else if (type === 'school') {
       const n = clamp(Math.round((by && by.viewers ? by.viewers : 20) / 2), 8, 40);
       const dir = Math.random() < 0.5 ? 1 : -1;
@@ -763,7 +763,7 @@
       if (by && by.login) {
         const f = ensureFish(by);
         unlockRare(f, 'whale', `帶著 ${by.viewers || 0} 位觀眾揪團進來`);
-      } else banner('🐟 一大群魚游過去了！');
+      } else banner('一大群魚游過去了！');
     }
   }
   const schools = [];
@@ -792,7 +792,7 @@
         const d = Math.hypot(f.x - ev.x, f.y - ev.y);
         if (f.species === 'shark') { f.flee = 0; continue; } // 觀眾的鯊魚跟著大鯊魚
         if (d < 300 * S && f.state !== 'jump') {
-          if (f.flee <= 0) parts.push({ k: 'text', t: '❗', color: '#ff4a4a', x: f.x, y: f.y - extent(f, TOP) - 6 * S, vx: 0, vy: -30 * S, r: 18 * S, life: 0, max: 0.8 });
+          if (f.flee <= 0) parts.push({ k: 'text', t: '!', color: '#ff4a4a', x: f.x, y: f.y - extent(f, TOP) - 6 * S, vx: 0, vy: -30 * S, r: 18 * S, life: 0, max: 0.8 });
           f.flee = 1.2;
           f.fleeX = ev.x;
           f.fleeY = ev.y;
@@ -844,7 +844,7 @@
     for (let i = 0; i < n; i++) parts.push({ k: 'drop', x: x + rand(-10, 10) * S, y, vx: rand(-90, 90) * S, vy: -rand(120, 260) * S, r: rand(1.5, 3.5) * S, life: 0, max: 1.2 });
   }
   function hearts(x, y, n) {
-    for (let i = 0; i < n; i++) parts.push({ k: 'text', t: '❤', color: '#ff5c8a', x: x + rand(-20, 20) * S, y, vx: rand(-20, 20) * S, vy: -rand(30, 70) * S, r: rand(14, 22) * S, life: 0, max: 2 });
+    for (let i = 0; i < n; i++) parts.push({ k: 'heart', color: '#ff5c8a', x: x + rand(-20, 20) * S, y, vx: rand(-20, 20) * S, vy: -rand(30, 70) * S, r: rand(14, 22) * S, life: 0, max: 2 });
   }
   function poof(f) {
     for (let i = 0; i < 14; i++) {
@@ -1277,6 +1277,12 @@
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * a + 1, 0, TAU);
+      ctx.fill();
+    } else if (p.k === 'heart') {
+      ctx.globalAlpha = Math.min(1, a * 1.5);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      heartPath(p.x, p.y, p.r * 0.45);
       ctx.fill();
     } else if (p.k === 'text') {
       ctx.globalAlpha = Math.min(1, a * 1.5);
@@ -1986,11 +1992,7 @@
   }
 
   function badgeIcon(b) {
-    if (b.broadcaster) return '👑 ';
-    if (b.mod) return '⚔️ ';
-    if (b.vip) return '💎 ';
-    if (b.sub) return '⭐ ';
-    return '';
+    return ''; // 不在名字前面加符號圖示
   }
 
   // 名字與泡泡排版：先放泡泡（最新的優先），再放名字；疊到已經放好的就藏起來（淡出），不會擠成一團
@@ -2181,7 +2183,7 @@
       }
     });
     const hideBtn = el.querySelector('[data-act=hide]');
-    const syncBtn = () => { hideBtn.textContent = el.classList.contains('mini') ? '＋' : '－'; };
+    const syncBtn = () => { hideBtn.textContent = el.classList.contains('mini') ? '展開' : '收起'; };
     hideBtn.addEventListener('click', () => { el.classList.toggle('mini'); syncBtn(); });
     syncBtn();
   }
@@ -2192,7 +2194,7 @@
   if (opt.demo) setupDemo();
   if (opt.channel) {
     connectChat(opt.channel, handleChat, (s) => {
-      if (s === 'joined') status(`🐟 已連上 #${opt.channel} 聊天室`);
+      if (s === 'joined') status(`已連上 #${opt.channel} 聊天室`);
       else if (s === 'closed') status('聊天室斷線，重新連線中…', true);
     });
   } else if (!opt.demo) {
