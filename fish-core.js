@@ -62,10 +62,45 @@
     help: ['fishhelp', '魚說明', '水族箱'],
     tank: ['tank'], // 實況主／管理員專用：!tank clear、!tank feed、!tank shark…
   };
-  const ALIAS = {};
-  for (const [cmd, list] of Object.entries(COMMANDS)) for (const a of list) ALIAS[a.toLowerCase()] = cmd;
-  // 直接打魚種名稱也能變身，例如 !鯊魚
-  for (const [id, sp] of Object.entries(SPECIES)) for (const a of sp.aliases) if (!ALIAS[a.toLowerCase()]) ALIAS[a.toLowerCase()] = 'skin:' + id;
+  // 指令在設定頁顯示的名稱與預設叫法（第一個是說明卡、提示裡顯示的那個）；實況主可以改叫法或關掉
+  const CMD_INFO = {
+    join: { name: '加入', words: ['魚', 'fish', 'join', '入缸', '加入'] },
+    leave: { name: '離開', words: ['離開', 'leave', 'bye', '掰掰'] },
+    skin: { name: '換魚種', words: ['變', 'skin', '換', '變身'] },
+    color: { name: '換顏色', words: ['顏色', 'color', 'colour', '色'] },
+    color2: { name: '副色', words: ['副色', 'color2', '鰭色', '第二顏色'] },
+    wearcolor: { name: '配件色', words: ['配件色', 'wearcolor', '配件顏色'] },
+    jump: { name: '跳', words: ['跳', 'jump'] },
+    dash: { name: '衝刺', words: ['衝', 'dash', '衝刺'] },
+    spin: { name: '轉圈', words: ['轉', 'spin', '轉圈', 'dance', '跳舞'] },
+    sleep: { name: '睡覺', words: ['睡', 'sleep', '睡覺'] },
+    bubble: { name: '吐泡泡', words: ['泡泡', 'bubble', '吐泡泡', 'puff', '膨'] },
+    feed: { name: '餵食', words: ['餵', 'feed', '餵食', '飼料'] },
+    follow: { name: '跟隨', words: ['跟', 'follow', '跟隨'] },
+    hug: { name: '抱抱', words: ['抱', 'hug', '抱抱', 'kiss', '親'] },
+    avatar: { name: '頭像', words: ['頭像', 'avatar', '臉'] },
+    wear: { name: '配件', words: ['戴', 'wear', '配件', '穿'] },
+    pattern: { name: '花紋', words: ['花紋', 'pattern', '圖案'] },
+    size: { name: '大小', words: ['大小', 'size', '體型'] },
+    tag: { name: '名牌', words: ['名牌', 'tag', 'nametag'] },
+    face: { name: '表情', words: ['表情', 'face', 'expr', '眼睛'] },
+    mine: { name: '提交自己的魚', words: ['我的魚', 'myfish', '我的圖'] },
+    help: { name: '說明卡', words: ['fishhelp', '魚說明', '水族箱'] },
+  };
+  // 叫法清單 → { 叫法: 指令 }。words：{ 指令: [叫法…] }（沒給就用預設）；off：關掉的指令
+  function buildAliases(words = {}, off = []) {
+    const map = {};
+    for (const [cmd, list] of Object.entries(COMMANDS)) {
+      if (off.includes(cmd)) continue;
+      for (const a of (cmd !== 'tank' && words[cmd]) || list) if (!map[a.toLowerCase()]) map[a.toLowerCase()] = cmd;
+    }
+    // 直接打魚種名稱也能變身，例如 !鯊魚
+    if (!off.includes('skin')) for (const [id, sp] of Object.entries(SPECIES)) for (const a of sp.aliases) if (!map[a.toLowerCase()]) map[a.toLowerCase()] = 'skin:' + id;
+    return map;
+  }
+  const ALIAS = buildAliases();
+  // 「魚、join，入缸」→ ['魚', 'join', '入缸']（逗號、頓號、空白都可以分）
+  const splitWords = (v) => String(v || '').split(/[\s,，、]+/).map((w) => w.trim().replace(/^[!！]/, '')).filter(Boolean).slice(0, 8);
 
   // 各指令的個人冷卻（毫秒）
   // 配件（戴在魚頭上）與花紋（畫在魚身上）：全部用程式畫，不用圖片
@@ -172,7 +207,7 @@
   // ── 魚缸物件 ──
   // 物件種類（畫法在 objects.js）；網址參數 objs=種類~x~y~大小~翻轉~顏色|…
   // x、y 是在魚缸範圍裡的位置（0～1，y 是物件底部；空白 = 放在沙地上）；自訂圖片的種類是 img0、img1…（對應 oimg 參數）
-  const OBJECT_IDS = ['castle', 'chest', 'coral', 'bubbler', 'ship', 'helmet', 'shell', 'starfish', 'rock', 'plant', 'anchor', 'pillar'];
+  const OBJECT_IDS = ['castle', 'chest', 'coral', 'bubbler', 'ship', 'helmet', 'shell', 'starfish', 'rock', 'plant', 'anchor', 'pillar', 'seaweed'];
   const num3 = (v, lo, hi, d) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
   function parseObjects(str, imgCount = 0) {
     const out = [];
@@ -234,10 +269,10 @@
   // 「!指令 參數」→ { cmd, arg, target }；不是指令回傳 null
   // skins：實況主自訂的魚種（直接打 !名字 也能變身）
   // target：!抱／!跟 的對象；!餵 的對象（null = 只給自己，'*' = 給大家）
-  function parseCommand(text, skins = []) {
+  function parseCommand(text, skins = [], aliases = ALIAS) {
     const m = String(text || '').trim().match(/^[!！]\s*(\S+)\s*(.*)$/);
     if (!m) return null;
-    let cmd = ALIAS[m[1].toLowerCase()];
+    let cmd = aliases[m[1].toLowerCase()];
     const custom = !cmd && skins.find((k) => k.name.toLowerCase() === m[1].toLowerCase());
     if (custom) cmd = 'skin:' + custom.id;
     if (!cmd) return null;
@@ -357,6 +392,114 @@
     return { top: t, bottom: bo, left: l, right: r };
   }
 
+  // ── 外觀、文字、手感、大事件：設定頁照這份清單畫表單，水族箱照這份清單讀網址參數 ──
+  // type：color、range（min/max/step）、number、select（options）、check、text、lines（多行，用 | 存）
+  const FONTS = { sans: '黑體', serif: '明體', kai: '楷書', round: '圓體', system: '系統字型' };
+  const SETTINGS = [
+    // 字型與名牌
+    { k: 'font', g: 'style', label: '字型', type: 'select', options: FONTS, def: 'sans' },
+    { k: 'nsize', g: 'style', label: '名字大小', type: 'range', min: 8, max: 32, step: 1, def: 13 },
+    { k: 'ncolor', g: 'style', label: '名字顏色', type: 'color', def: '#ffffff' },
+    { k: 'nline', g: 'style', label: '名字外框', type: 'color', def: '#001428' },
+    // 對話泡泡
+    { k: 'bsize', g: 'style', label: '泡泡字大小', type: 'range', min: 10, max: 36, step: 1, def: 15 },
+    { k: 'bbg', g: 'style', label: '泡泡底色', type: 'color', def: '#ffffff' },
+    { k: 'btext', g: 'style', label: '泡泡文字', type: 'color', def: '#1b2733' },
+    { k: 'nbub', g: 'style', label: '同時最多幾個泡泡', type: 'number', min: 0, max: 30, def: 8 },
+    { k: 'bsec', g: 'style', label: '泡泡顯示幾秒', type: 'number', min: 2, max: 30, def: 6 },
+    // 橫幅、提示、說明卡
+    { k: 'gbg', g: 'style', label: '橫幅底色（左）', type: 'color', def: '#ff8a2a' },
+    { k: 'gbg2', g: 'style', label: '橫幅底色（右）', type: 'color', def: '#ffcf3f' },
+    { k: 'gtext', g: 'style', label: '橫幅文字', type: 'color', def: '#2a1400' },
+    { k: 'tbg', g: 'style', label: '提示與說明卡底色', type: 'color', def: '#041e34' },
+    { k: 'ttext', g: 'style', label: '提示與說明卡文字', type: 'color', def: '#e6f6ff' },
+    { k: 'tkey', g: 'style', label: '指令強調色', type: 'color', def: '#ffd84a' },
+    // 魚缸外框
+    { k: 'glass', g: 'look', label: '不是全畫面時畫玻璃魚缸外框', type: 'check', def: true },
+    { k: 'gcol', g: 'look', label: '魚缸外框顏色', type: 'color', def: '#c8ebff' },
+    // 手感
+    { k: 'cd', g: 'tune', label: '指令冷卻倍率（0 = 不冷卻）', type: 'range', min: 0, max: 3, step: 0.1, def: 1 },
+    { k: 'spd', g: 'tune', label: '魚游泳速度', type: 'range', min: 0.3, max: 3, step: 0.1, def: 1 },
+    { k: 'grow', g: 'tune', label: '每吃一顆飼料長大多少', type: 'range', min: 0, max: 0.2, step: 0.01, def: 0.04 },
+    { k: 'maxsize', g: 'tune', label: '最大能長到幾倍', type: 'range', min: 1, max: 4, step: 0.1, def: 2 },
+    // 大事件
+    { k: 'ev', g: 'event', label: '隨機出現哪些大事件', type: 'multi', options: { shark: '鯊魚出沒', whirl: '大漩渦', treasure: '寶箱掉落' }, def: 'shark,whirl,treasure' },
+    { k: 'shc', g: 'event', label: '鯊魚顏色', type: 'color', def: '#5d7286' },
+    { k: 'shs', g: 'event', label: '鯊魚大小', type: 'range', min: 0.5, max: 2.5, step: 0.1, def: 1 },
+    { k: 'shsp', g: 'event', label: '鯊魚速度', type: 'range', min: 0.3, max: 3, step: 0.1, def: 1 },
+    { k: 'chomp', g: 'event', label: '鯊魚最多咬飛幾隻', type: 'number', min: 0, max: 20, def: 3 },
+    { k: 'whirl', g: 'event', label: '漩渦轉幾秒', type: 'number', min: 3, max: 30, def: 8 },
+    { k: 'whc', g: 'event', label: '漩渦線條顏色', type: 'color', def: '#d2f0ff' },
+    { k: 'trc', g: 'event', label: '寶箱顏色', type: 'color', def: '#a8662e' },
+    { k: 'tsec', g: 'event', label: '寶箱沒人搶幾秒後消失', type: 'number', min: 10, max: 180, def: 40 },
+    { k: 'scc', g: 'event', label: '揪團魚群顏色（空白 = 彩色）', type: 'color', def: '', empty: '彩色' },
+    // 文字內容：{名字} {原因} {魚種} 會換成實際的內容；多行的每一行是一句，隨機挑
+    { k: 'x_shark', g: 'text', label: '鯊魚出沒的橫幅', type: 'text', def: '鯊魚出沒！快逃！' },
+    { k: 'x_whirl', g: 'text', label: '大漩渦的橫幅', type: 'text', def: '大漩渦來了！' },
+    { k: 'x_treasure', g: 'text', label: '寶箱掉落的橫幅', type: 'text', def: '寶箱掉下來了！第一隻碰到的魚解鎖稀有魚種！' },
+    { k: 'x_lost', g: 'text', label: '寶箱沒人搶到', type: 'text', def: '寶箱沉到沙裡不見了…' },
+    { k: 'x_school', g: 'text', label: '魚群游過的橫幅', type: 'text', def: '一大群魚游過去了！' },
+    { k: 'x_by', g: 'text', label: '誰叫來的（接在大事件後面）', type: 'text', def: '（{名字} 叫來的）' },
+    { k: 'x_unlock', g: 'text', label: '解鎖稀有魚種的橫幅', type: 'text', def: '{名字} {原因}，解鎖稀有魚種「{魚種}」！' },
+    { k: 'x_allrare', g: 'text', label: '稀有魚種都有了', type: 'text', def: '{名字} {原因}，稀有魚種都收集齊了，直接變大！' },
+    { k: 'x_join', g: 'text', label: '魚剛加入時說的話', type: 'text', def: '我在這裡！' },
+    { k: 'x_leave', g: 'text', label: '魚離開時說的話', type: 'text', def: '掰掰～' },
+    { k: 'x_idle', g: 'text', label: '太久沒講話游走時說的話', type: 'text', def: '去睡囉 zzz' },
+    { k: 'x_scream', g: 'text', label: '被鯊魚咬到時說的話', type: 'lines', def: '救命啊！|差點被吃掉|嚇死我了|我不好吃！' },
+    { k: 'x_dizzy', g: 'text', label: '漩渦結束時說的話', type: 'lines', def: '頭好暈 @_@|再來一次！|嘔…|好好玩' },
+    { k: 'x_help', g: 'text', label: '說明卡標題', type: 'text', def: '水族箱指令' },
+    { k: 'x_tips', g: 'text', label: '左下角輪播提示（一行一句；{跳} 這種寫法會換成目前的指令）', type: 'lines',
+      def: '在聊天室輸入 {魚} 加入水族箱|!鯊魚 !河豚 !水母 !小丑魚 換魚種|{顏色} 粉、{顏色} 彩虹、{顏色} #66ccff 換顏色|{跳} {衝} {轉} {睡} {泡泡} 做動作|{餵} 自己吃、{餵} @名字 請別人吃、{餵} 大家 全場吃|{頭像} 加一個表情符號，把它放到魚身上|{戴} 皇冠、{花紋} 星星、{副色} 藍、{配件色} 粉 打扮自己的魚|{表情} 開心、{大小} 大、{名牌} 粉|{抱} @名字 抱抱、{跟} @名字 跟著游|稀有魚種 !鯨魚 !獨角鯨 !錦鯉：{稀有}' },
+  ];
+  const SETTING = Object.fromEntries(SETTINGS.map((x) => [x.k, x]));
+  // 網址參數 → 設定值（不合法或沒給就用預設）
+  function readSetting(x, raw) {
+    if (raw === null || raw === undefined) return x.type === 'multi' ? x.def.split(',') : x.def;
+    if (x.type === 'color') return hex6(raw) || (x.empty !== undefined && raw === '' ? '' : x.def);
+    if (x.type === 'range' || x.type === 'number') { const n = parseFloat(raw); return Number.isFinite(n) ? Math.min(x.max, Math.max(x.min, n)) : x.def; }
+    if (x.type === 'select') return x.options[raw] ? raw : x.def;
+    if (x.type === 'check') return !['0', 'false', 'off', 'no'].includes(raw);
+    if (x.type === 'multi') return raw.split(',').filter((v) => x.options[v]);
+    return String(raw).slice(0, x.type === 'lines' ? 2000 : 200);
+  }
+  // 設定值 → 網址參數（跟預設一樣就不寫，網址比較短）
+  function writeSetting(x, v) {
+    const def = x.type === 'multi' ? x.def : x.def;
+    const out = x.type === 'multi' ? v.join(',') : x.type === 'check' ? (v ? '1' : '0') : String(v);
+    const d = x.type === 'check' ? (def ? '1' : '0') : String(def);
+    return out === d ? null : out;
+  }
+  // 文字樣板：{名字} → vars.名字
+  const fillText = (t, vars = {}) => String(t || '').replace(/\{([^{}]+)\}/g, (all, k) => (k in vars ? vars[k] : all));
+  const pickLine = (lines, rnd = Math.random) => { const l = String(lines || '').split('|').map((x) => x.trim()).filter(Boolean); return l.length ? l[Math.floor(rnd() * l.length)] : ''; };
+
+  // ── 開台中即時同步：設定頁送出的訊息都用只有 OBS 網址知道的暗號簽章（HMAC），別人送的假訊息會被丟掉 ──
+  const SIG_WINDOW_MS = 5 * 60 * 1000;
+  const subtle = () => (typeof crypto !== 'undefined' && crypto.subtle) || null;
+  const enc = (t) => new TextEncoder().encode(t);
+  const hexOf = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  const sortKeys = (v) => (Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.keys(v).sort().reduce((o, k) => { o[k] = sortKeys(v[k]); return o; }, {}) : v);
+  const canonical = (msg) => { const { sig, ...rest } = msg; void sig; return JSON.stringify(sortKeys(rest)); };
+  async function hmac(secret, text) {
+    const key = await subtle().importKey('raw', enc(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return hexOf(await subtle().sign('HMAC', key, enc(text)));
+  }
+  async function signMessage(secret, msg) {
+    const body = { ...msg, ts: msg.ts || Date.now() };
+    return { ...body, sig: await hmac(secret, canonical(body)) };
+  }
+  async function verifyMessage(secret, msg, now = Date.now()) {
+    if (!msg || typeof msg.sig !== 'string' || typeof msg.ts !== 'number' || !secret) return false;
+    if (Math.abs(now - msg.ts) > SIG_WINDOW_MS) return false;
+    const expected = await hmac(secret, canonical(msg));
+    if (expected.length !== msg.sig.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ msg.sig.charCodeAt(i);
+    return diff === 0;
+  }
+  // 即時同步不送的參數：暗號、試算表（公開的中繼伺服器上別人可能看得到內容）
+  const PRIVATE_PARAMS = ['room', 'key', 'store', 'skey', 'demo', 'edit'];
+
   // OBS 網址參數 → 設定
   const DEFAULTS = {
     channel: '',
@@ -422,6 +565,14 @@
       objimgs: p.getAll('oimg').filter((u) => IMAGE_URL.test(u)).slice(0, 10),
     };
     o.objects = p.has('objs') ? parseObjects(p.get('objs'), o.objimgs.length) : decoToObjects(o.deco);
+    o.ui = Object.fromEntries(SETTINGS.map((x) => [x.k, readSetting(x, p.get(x.k))]));
+    o.words = {};
+    for (const cmd of Object.keys(CMD_INFO)) { const w = splitWords(p.get('c_' + cmd)); if (w.length) o.words[cmd] = w; }
+    o.off = (p.get('off') || '').split(',').filter((c) => CMD_INFO[c]);
+    o.aliases = buildAliases(o.words, o.off);
+    o.room = /^[A-Za-z0-9]{6,24}$/.test(p.get('room') || '') ? p.get('room') : '';
+    o.key = p.get('key') || '';
+    o.t = +p.get('t') || 0;
     o.edit = p.get('edit') === '1';
     return o;
   }
@@ -437,5 +588,5 @@
     return common[hashStr(login) % common.length];
   }
 
-  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, THEMES, LAYERS, resolveTheme, mixHex, hex6, WEARS, PATTERNS, findWear, findPattern, IMAGE_URL, EXPRESSIONS, SIZES, findExpression, findSize, OFF, OBJECT_IDS, parseObjects, stringifyObjects, decoToObjects, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
+  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, CMD_INFO, buildAliases, splitWords, FONTS, SETTINGS, SETTING, readSetting, writeSetting, fillText, pickLine, signMessage, verifyMessage, PRIVATE_PARAMS, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, THEMES, LAYERS, resolveTheme, mixHex, hex6, WEARS, PATTERNS, findWear, findPattern, IMAGE_URL, EXPRESSIONS, SIZES, findExpression, findSize, OFF, OBJECT_IDS, parseObjects, stringifyObjects, decoToObjects, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
 });

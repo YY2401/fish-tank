@@ -3,7 +3,9 @@
 觀眾在 Twitch 聊天室講話或打指令，就會變成一隻魚在直播畫面裡游泳：換魚種、換顏色、跳、衝、轉圈、睡覺、餵食長大、抱抱別人。
 純前端網頁，OBS 加一個瀏覽器來源就能用；讀聊天室用匿名連線，**不用登入、不用 Client ID**。
 
-**線上使用：<https://yy2401.github.io/fish-tank/>**（打開設定頁，填頻道，複製 OBS 網址）
+**線上使用：<https://yy2401.github.io/fish-tank/>**（打開設定頁，照最上面的三步驟：填頻道、點配色、複製 OBS 網址）
+
+開台中只要開著設定頁，改任何設定直播畫面都會即時更新（設定頁和 OBS 透過公開 MQTT 中繼伺服器同步，訊息用只存在 OBS 網址裡的暗號做 HMAC 簽章；同一個瀏覽器時走 BroadcastChannel）。
 
 **教學圖文**：[快速上手](docs/直播水族箱_快速上手_20261031.png)・[觀眾指令（可以放在直播畫面或頻道介紹）](docs/直播水族箱_觀眾指令_20261031.png)・[完整使用說明書 PDF](docs/直播水族箱_使用說明書_20261031.pdf)
 
@@ -77,6 +79,12 @@
 | `weed` | 海草：0 沒有、1 一般、2 多、3 很多 | 1 |
 | `bgimg` | 背景圖片網址（https） | |
 | `submit=0` | 不讓觀眾用 `!我的魚` 提交圖片 | 1 |
+| `c_<指令>` / `off` | 指令改叫法（例：`c_jump=蹦,hop`）／關掉的指令（例：`off=feed,sleep`） | |
+| 樣式 | `font` `nsize` `ncolor` `nline` `bsize` `bbg` `btext` `nbub` `bsec` `gbg` `gbg2` `gtext` `tbg` `ttext` `tkey` `glass` `gcol` | 見 `fish-core.js` 的 `SETTINGS` |
+| 手感 | `cd`（冷卻倍率）`spd`（游泳速度）`grow`（每顆飼料長大）`maxsize` | |
+| 大事件 | `ev`（要哪幾種）`shc` `shs` `shsp` `chomp` `whirl` `whc` `trc` `tsec` `scc` | |
+| 文字 | `x_shark` `x_whirl` `x_treasure` `x_lost` `x_school` `x_by` `x_unlock` `x_allrare` `x_join` `x_leave` `x_idle` `x_scream` `x_dizzy` `x_help` `x_tips`（多句用 `\|` 分） | |
+| `room` / `key` / `t` | 即時同步的配對碼、簽章暗號、複製時間（設定頁自動產生） | |
 | `pfp=0` | 不讓觀眾用 `!頭像 大頭貼`（大頭貼透過 decapi.me 查詢） | 1 |
 | `demo=1` | 顯示測試面板（模擬聊天、訂閱、小奇點、揪團、大事件） | |
 | `ignore` | 不變成魚的帳號（逗號分隔） | 常見機器人 |

@@ -86,6 +86,13 @@ async function shotPage(page, name) {
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
   await page.addStyleTag({ content: '.left > section, .right > section { scroll-margin: 0 }' });
+  // 一打開的樣子（只有基本設定是打開的）
+  await page.waitForFunction(() => /demo=1/.test(document.getElementById('preview').src));
+  await sleep(2000);
+  await shotPage(page, 'setup-overview');
+  await shotEl(page, 'setup-quick', '.quick');
+  // 之後要截各區的內容：全部打開
+  await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
   const sec = (n) => `main section:nth-of-type(${n})`;
   const leftSec = (n) => `.left > section:nth-of-type(${n})`;
   const rightSec = (n) => `.right > section:nth-of-type(${n})`;
@@ -121,7 +128,16 @@ async function shotPage(page, name) {
   await page.click('#customColor');
 
   await mark(page, ['#event']);
-  await shotRange(page, 'setup-deco', '#decoLbl', 'label:has(#event)');
+  await shotRange(page, 'setup-deco', '#secEvent h2', '#secEvent .gen label:has(input[type=number])', 14, 10); // 5. 大事件：頻率、要哪幾種、鯊魚
+
+  // 6. 文字與顏色：樣式的部分；7. 指令與手感：指令表的前幾行與手感
+  await page.select('#secText .gen select', 'kai');
+  await mark(page, ['#secText .gen[data-group="style"]']);
+  await shotRange(page, 'setup-text', '#secText h2', '#secText .gen[data-group="style"] > div:nth-child(6)', 14, 12);
+  await page.select('#secText .gen select', 'sans');
+  await mark(page, ['#cmds']);
+  await shotRange(page, 'setup-cmds', '#secTune .lbl', '#cmds .cmd:nth-child(6)', 14, 10);
+  await mark(page, []);
 
   // 物件編輯：加幾個物件、選一個（預覽上出現黃色虛線框）
   await page.click('#objPalette [data-obj="ship"]');
@@ -152,16 +168,15 @@ async function shotPage(page, name) {
   await page.waitForSelector('#rewards .reward');
   await page.select('#rewards .reward select', 'rare');
   await mark(page, ['#rewards .reward']);
-  await shotRange(page, 'setup-rare', `${leftSec(4)} .lbl`, '#rewards');
+  await shotRange(page, 'setup-rare', '#secRare .lbl', '#rewards');
 
-  await page.click('#advanced summary'); // 試算表收在「進階」裡
   await mark(page, ['#copyScript']);
-  await shotRange(page, 'setup-sheet-copy', `${leftSec(5)} ol li:nth-child(1)`, `${leftSec(5)} ol li:nth-child(2)`, 10, 6);
+  await shotRange(page, 'setup-sheet-copy', '#advanced ol li:nth-child(1)', '#advanced ol li:nth-child(2)', 10, 6);
   await page.type('#store', STORE);
   await page.click('#testStore');
   await page.waitForFunction(() => /連上了/.test(document.getElementById('storeMsg').textContent));
   await mark(page, ['#store', '#testStore', '#storeMsg']);
-  await shotRange(page, 'setup-sheet-test', `${leftSec(5)} ol li:nth-child(3)`, '#storeMsg', 10, 8);
+  await shotRange(page, 'setup-sheet-test', '#advanced ol li:nth-child(3)', '#storeMsg', 10, 8);
   // 試算表截完就清掉，後面的 OBS 網址比較短
   await page.click('#store', { clickCount: 3 });
   await page.keyboard.press('Backspace');
@@ -169,16 +184,11 @@ async function shotPage(page, name) {
 
   // 截圖用正式網址（測試伺服器的位址對讀者沒意義）
   await page.evaluate(() => { const u = document.getElementById('url'); u.value = u.value.replace(location.origin + '/', 'https://yy2401.github.io/fish-tank/'); });
-  await mark(page, ['#copy']);
+  // 即時同步的狀態：截圖時顯示「直播畫面已更新」的樣子（測試環境連不到中繼伺服器）
+  await page.evaluate(() => { document.getElementById('liveDot').className = 'dot on'; document.getElementById('liveText').textContent = '直播畫面已更新（21:30:05）'; });
+  await mark(page, ['#copy', 'label.live']);
   await shotEl(page, 'setup-obs', rightSec(1));
-
   await mark(page, []);
-  await page.waitForFunction(() => /demo=1/.test(document.getElementById('preview').src));
-  await sleep(2500);
-  await page.evaluate(() => scrollTo(0, 0));
-  await page.setViewport({ width: 1280, height: 860, deviceScaleFactor: 2 });
-  await sleep(1500);
-  await shotPage(page, 'setup-overview'); // 一打開看到的樣子
   await page.close();
 
   // ───────── 水族箱畫面 ─────────

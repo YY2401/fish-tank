@@ -1,14 +1,14 @@
-html, body { margin: 0; height: 100%; overflow: hidden; background: #07304f; font-family: "Noto Sans TC", system-ui, sans-serif; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #07304f; font-family: var(--font, "Noto Sans TC", system-ui, sans-serif); }
 html.transparent, html.transparent body { background: transparent; }
 canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 .tip {
   position: fixed; left: 2vmin; bottom: 2vmin; padding: .5em 1em; border-radius: 999px;
-  background: rgba(4, 30, 52, .72); color: #e6f6ff; font-size: clamp(12px, 2vmin, 22px); font-weight: 500;
+  background: var(--panel-bg, rgba(4, 30, 52, .72)); color: var(--panel-text, #e6f6ff); font-size: clamp(12px, 2vmin, 22px); font-weight: 500;
   opacity: 0; transform: translateY(8px); transition: opacity .5s, transform .5s; pointer-events: none;
 }
 .tip.show { opacity: 1; transform: none; }
-.tip b { color: #ffd84a; font-weight: 900; }
+.tip b { color: var(--panel-key, #ffd84a); font-weight: 900; }
 
 .status {
   position: fixed; right: 2vmin; top: 2vmin; padding: .4em .9em; border-radius: 8px;
@@ -20,13 +20,13 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .help {
   position: fixed; left: 50%; top: 50%; transform: translate(-50%, -46%) scale(.96); opacity: 0;
   transition: opacity .4s, transform .4s; pointer-events: none;
-  background: rgba(4, 30, 52, .9); color: #e6f6ff; border: 2px solid rgba(160, 220, 255, .4);
+  background: var(--panel-bg-strong, rgba(4, 30, 52, .9)); color: var(--panel-text, #e6f6ff); border: 2px solid rgba(160, 220, 255, .4);
   border-radius: 18px; padding: 1.2em 1.8em; font-size: clamp(13px, 2.2vmin, 24px); min-width: 30em;
 }
 .help.show { opacity: 1; transform: translate(-50%, -50%); }
 .help h2 { margin: 0 0 .6em; font-weight: 900; font-size: 1.3em; }
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: .45em 1.2em; margin: 0; }
-.help dt { color: #ffd84a; font-weight: 700; }
+.help dt { color: var(--panel-key, #ffd84a); font-weight: 700; }
 .help dd { margin: 0; }
 
 .demo {
@@ -49,7 +49,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .banner {
   position: fixed; left: 50%; top: 9vh; transform: translate(-50%, -20px) scale(.9); opacity: 0; pointer-events: none;
   max-width: 86vw; padding: .55em 1.3em; border-radius: 999px; text-align: center;
-  background: linear-gradient(90deg, #ff8a2a, #ffcf3f); color: #2a1400; font-weight: 900;
+  background: linear-gradient(90deg, var(--banner-a, #ff8a2a), var(--banner-b, #ffcf3f)); color: var(--banner-text, #2a1400); font-weight: 900;
   font-size: clamp(14px, 3vmin, 34px); box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
   transition: opacity .35s, transform .35s cubic-bezier(.2, 1.6, .4, 1);
 }

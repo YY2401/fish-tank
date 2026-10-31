@@ -16,6 +16,7 @@
     plant: { name: '水草叢', color: '#3c9a5c', w: 96, h: 150 },
     anchor: { name: '錨', color: '#7d8a96', w: 80, h: 116 },
     pillar: { name: '遺跡柱', color: '#d8d0bc', w: 64, h: 160 },
+    seaweed: { name: '海草', color: '#2f8a4f', w: 30, h: 160, live: true }, // 會擺動：水族箱每幀畫，這裡只畫設定頁的小圖
   };
 
   function rgb(hex) {
@@ -321,6 +322,21 @@
       }
       g.fillStyle = shade(c, 0.35);
       g.fillRect(-2, -98, 3, 80);
+    },
+    seaweed(g, c) {
+      g.strokeStyle = c;
+      g.lineCap = 'round';
+      let x = 0, y = 0;
+      for (let i = 0; i < 7; i++) {
+        const k = i / 7;
+        const nx = Math.sin(i * 0.9) * 10 * k * 2, ny = y - 160 / 7;
+        g.lineWidth = 8 * (1 - k * 0.7);
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(nx, ny);
+        g.stroke();
+        x = nx; y = ny;
+      }
     },
     pillar(g, c) {
       const body = g.createLinearGradient(-26, 0, 26, 0);

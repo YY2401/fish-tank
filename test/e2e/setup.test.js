@@ -18,8 +18,11 @@ if (!H.chromePath()) {
     await page.goto(`${srv.url}/index.html`, { waitUntil: 'load' });
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'load' });
+    await openAll(page);
     return page;
   }
+  // 設定頁的每一區預設是收起來的（只有基本設定打開）；測試要點裡面的欄位，先全部打開
+  const openAll = (page) => page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
   const obsUrl = async (page) => new URL(await page.$eval('#url', (e) => e.value)).searchParams;
   async function typeInto(page, sel, text) {
     await page.click(sel, { clickCount: 3 });
@@ -77,7 +80,6 @@ if (!H.chromePath()) {
     let key = null;
     const page = await open(t, { sheet: (body) => { key = body.key; return { ok: true, profiles: { a: {}, b: {} } }; } });
     await page.evaluate(() => { window.__copied = ''; navigator.clipboard.writeText = async (s) => { window.__copied = s; }; });
-    await page.click('#advanced summary');
     await page.click('#copyScript');
     await page.waitForFunction(() => window.__copied.length > 0);
     const code = await page.evaluate(() => window.__copied);
@@ -97,7 +99,6 @@ if (!H.chromePath()) {
 
   test('試算表網址打錯會提醒', async (t) => {
     const page = await open(t);
-    await page.click('#advanced summary');
     await typeInto(page, '#store', 'https://example.com/x');
     await page.click('#testStore');
     assert.match(await page.$eval('#storeMsg', (e) => e.textContent), /script\.google\.com/);
@@ -180,6 +181,7 @@ if (!H.chromePath()) {
     await page.click('#submit');
     assert.equal((await obsUrl(page)).get('submit'), '0');
     await page.reload({ waitUntil: 'load' });
+    await openAll(page);
     p = await obsUrl(page);
     assert.equal(p.get('theme'), 'sunset', '重新整理後還在');
     assert.equal(p.get('hide'), 'rays,rocks');
@@ -244,5 +246,97 @@ if (!H.chromePath()) {
     assert.equal(C.parseObjects(p.get('objs'), 1).at(-1).t, 'img0');
     await page.click('#objDel');
     assert.equal((await obsUrl(page)).getAll('oimg').length, 0, '刪掉物件時圖也一起拿掉');
+  });
+
+  test('第一次打開：上面有三步驟說明，只有基本設定是打開的', async (t) => {
+    const page = await H.newPage(browser, { width: 1280, height: 900 });
+    t.after(() => page.close());
+    await page.goto(`${srv.url}/index.html`, { waitUntil: 'load' });
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'load' });
+    assert.match(await page.$eval('.quick', (e) => e.textContent), /三步驟/);
+    const open = await page.$$eval('details.sec', (d) => d.map((x) => [x.querySelector('h2').textContent, x.open]));
+    assert.deepEqual(open.filter(([, o]) => o).map(([n]) => n), ['1. 基本設定']);
+    assert.equal(await page.$eval('#channel', (e) => e.offsetParent !== null), true, '頻道欄位直接看得到');
+    assert.equal(await page.$eval('#objPanel', (e) => getComputedStyle(e).display), 'none', '沒選物件時不顯示物件面板');
+    await page.click('[data-go="themes"]'); // 三步驟的第 2 步：自動打開配色那一區
+    assert.equal(await page.$eval('#secLook details', (d) => d.open), true);
+    await page.click('[data-go="channel"]');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'channel');
+  });
+
+  test('文字與顏色、指令、手感、大事件：表單改了就寫進網址，「已改幾項」與「還原預設」', async (t) => {
+    const page = await open(t);
+    await page.select('#secText .gen select', 'kai');
+    const shark = await page.$('#secText .gen input[placeholder="鯊魚出沒！快逃！"]');
+    await shark.click({ clickCount: 3 });
+    await shark.type('大白鯊！');
+    const row = async (name) => (await page.$$('#cmds .cmd')).find(async () => true) && (await page.evaluateHandle((n) => [...document.querySelectorAll('#cmds .cmd')].find((r) => r.querySelector('span').textContent === n), name)).asElement();
+    await (await (await row('睡覺')).$('input[type=checkbox]')).click(); // 關掉「睡覺」
+    const jump = await (await row('跳')).$('input[type=text]');
+    assert.equal(await jump.evaluate((e) => e.value), '跳、jump', '叫法欄位直接填好目前的值');
+    await jump.click({ clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await jump.type('蹦、hop');
+    await page.$eval('#secTune .gen input[type=range]', (e) => { e.value = '2'; e.dispatchEvent(new Event('input')); });
+    await (await page.$('#secEvent .multi input[value="treasure"]')).click();
+    let p = await obsUrl(page);
+    assert.equal(p.get('font'), 'kai');
+    assert.equal(p.get('x_shark'), '大白鯊！');
+    assert.equal(p.get('off'), 'sleep');
+    assert.equal(p.get('c_jump'), '蹦,hop');
+    assert.equal(p.get('cd'), '2');
+    assert.equal(p.get('ev'), 'shark,whirl');
+    assert.equal(await page.$eval('#secText .changed', (e) => e.textContent), '已改 2 項');
+    assert.equal(await page.$eval('#secTune .changed', (e) => e.textContent), '已改 3 項');
+    const table = await page.$eval('#cmdTable', (e) => [...e.rows].filter((r) => !r.hidden).map((r) => r.cells[0].textContent).join(' | '));
+    assert.match(table, /!蹦 !衝 !轉 !泡泡/, '觀眾指令表換成新叫法、拿掉關掉的 !睡');
+    await page.evaluate(() => { window.confirm = () => true; }); // 「確定要還原嗎？」直接按確定
+    await page.click('#secTune .reset button');
+    p = await obsUrl(page);
+    assert.ok(!p.has('off') && !p.has('c_jump') && !p.has('cd'), '還原預設');
+    assert.equal(await page.$eval('#secTune .changed', (e) => e.textContent), '');
+    assert.equal(await (await (await row('睡覺')).$('input[type=checkbox]')).evaluate((e) => e.checked), true);
+    assert.deepEqual(page.errors.filter((e) => !/native dialog/.test(e)), []);
+  });
+
+  test('即時同步：開著設定頁改配色，OBS 裡的水族箱馬上換；設定頁顯示已更新；暗號不對不收', async (t) => {
+    const page = await open(t);
+    await typeInto(page, '#channel', 'yy2401');
+    const url = await page.$eval('#url', (e) => e.value);
+    const p = new URLSearchParams(url.split('?')[1]);
+    assert.ok(p.get('room') && p.get('key') && p.get('t'));
+    // 同一個瀏覽器開「OBS 的水族箱」（測試裡走 BroadcastChannel）
+    const tank = await H.newPage(browser, { twitch: true });
+    t.after(() => tank.close());
+    await tank.goto(`${srv.url}/tank.html?${p.toString()}`, { waitUntil: 'load' });
+    await tank.waitForFunction(() => window.FishTank, { polling: 100 });
+    await page.waitForFunction(() => /OBS 的水族箱已連上|直播畫面已更新/.test(document.getElementById('liveText').textContent), { polling: 100 });
+    await page.bringToFront(); // 開了第二個分頁後設定頁在背景，背景分頁不能用滑鼠點
+    await page.click('[data-theme="candy"]');
+    await tank.waitForFunction(() => FishTank.opt.themeId === 'candy', { timeout: 5000, polling: 100 });
+    await page.waitForFunction(() => /直播畫面已更新/.test(document.getElementById('liveText').textContent), { polling: 100 });
+    // 改文字也會即時套用
+    await page.$eval('#secText .gen input[placeholder="水族箱指令"]', (e) => { e.value = '來玩吧'; e.dispatchEvent(new Event('input')); });
+    await tank.waitForFunction(() => document.querySelector('#help h2').textContent === '來玩吧', { timeout: 5000, polling: 100 });
+    // 重開 OBS（重新整理）：用最後一次即時同步的設定
+    await tank.reload({ waitUntil: 'load' });
+    await tank.waitForFunction(() => window.FishTank, { polling: 100 });
+    assert.equal(await tank.evaluate(() => FishTank.opt.themeId), 'candy');
+    // 暗號不對的假訊息
+    const fake = await tank.evaluate(async (room) => {
+      const m = await FishCore.signMessage('wrong-key', { type: 'cfg', q: 'theme=deep', mid: 'x1' });
+      new BroadcastChannel('fishtank:' + room).postMessage(m);
+      await new Promise((r) => setTimeout(r, 300));
+      return FishTank.opt.themeId;
+    }, p.get('room'));
+    assert.equal(fake, 'candy', '暗號不對的訊息丟掉');
+    // 關掉即時同步就不送
+    await page.bringToFront();
+    await page.click('#live');
+    await page.click('[data-theme="deep"]');
+    await H.sleep(800);
+    assert.equal(await tank.evaluate(() => FishTank.opt.themeId), 'candy');
+    assert.deepEqual(tank.errors, []);
   });
 }

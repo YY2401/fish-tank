@@ -1,13 +1,28 @@
 /* 水族箱畫面：讀聊天室 → 每位觀眾一隻魚，Canvas 模擬與繪製 */
 (function () {
   const C = FishCore;
+  // 設定：先讀網址；開台中設定頁改了會即時換成新的（見最下面的「即時同步」）
   const opt = C.readOptions(location.search);
+  const LIVE_STORE = 'fishtank.live.' + opt.room;
+  try { // OBS 重開時，用最後一次即時同步收到的設定（比網址新的話）
+    const saved = opt.room && JSON.parse(localStorage.getItem(LIVE_STORE) || 'null');
+    if (saved && saved.ts > opt.t) Object.assign(opt, C.readOptions(mergeLive(saved.q)));
+  } catch { /* 沒存過 */ }
+  // 即時同步收到的設定 + 這台自己網址裡的暗號、試算表（這些不經過中繼伺服器）
+  function mergeLive(q) {
+    const p = new URLSearchParams(q);
+    const mine = new URLSearchParams(location.search);
+    for (const k of C.PRIVATE_PARAMS) { p.delete(k); for (const v of mine.getAll(k)) p.append(k, v); }
+    return '?' + p.toString();
+  }
+  const FONT_FAMILY = { sans: '"Noto Sans TC", system-ui, sans-serif', serif: '"Noto Serif TC", serif', kai: '"LXGW WenKai TC", "Noto Sans TC", sans-serif', round: '"Zen Maru Gothic", "Noto Sans TC", sans-serif', system: 'system-ui, sans-serif' };
+  const FONT_URL = { sans: 'Noto+Sans+TC:wght@500;700;900', serif: 'Noto+Serif+TC:wght@500;700;900', kai: 'LXGW+WenKai+TC:wght@400;700', round: 'Zen+Maru+Gothic:wght@500;700;900' };
+  const font = () => FONT_FAMILY[opt.ui.font] || FONT_FAMILY.sans;
   const canvas = document.getElementById('tank');
   const ctx = canvas.getContext('2d');
   const TAU = Math.PI * 2;
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const MAX_BUBBLES = 8; // 同時最多幾個對話泡泡
 
   let W = 0, H = 0, DPR = 1, S = 1;
   let surfaceY = 0, floorY = 0;
@@ -56,7 +71,7 @@
     f.tag = p.tag === 'hide' || C.hex6(p.tag) ? p.tag : null;
     f.expr = C.EXPRESSIONS[p.face] ? p.face : null; // 表情（f.face 是魚頭朝哪邊）
     f.color = p.color || null;
-    f.size = clamp(+p.size || 1, 0.6, 2);
+    f.size = clamp(+p.size || 1, 0.6, opt.ui.maxsize);
     f.unlocked = Array.isArray(p.unlocked) ? p.unlocked.filter((id) => C.SPECIES[id]) : [];
     f.avatar = p.avatar && /^https:\/\//.test(p.avatar.url || '') ? { kind: p.avatar.kind, url: p.avatar.url } : null;
   }
@@ -177,7 +192,7 @@
     if (!opt.hide.includes('sand')) drawSand(b, th);
     if (!opt.hide.includes('rocks')) drawRocks(b, th);
     b.restore();
-    if (boxed) drawGlass(b);
+    if (boxed && opt.ui.glass) drawGlass(b);
     // 海草（會擺動，所以只記位置，每幀畫）；不比水深高。多寡：0 沒有、1 一般、2 多、3 很多
     const n = opt.weed ? Math.max(2, Math.round((TW / 110) * [0, 1, 1.8, 2.8][opt.weed])) : 0;
     const maxH = (floorY - surfaceY) * 0.8;
@@ -231,7 +246,7 @@
     b.save();
     boxPath(b);
     b.lineWidth = 6 * S;
-    b.strokeStyle = 'rgba(200,235,255,0.55)';
+    b.strokeStyle = rgba(opt.ui.gcol, 0.55);
     b.stroke();
     b.lineWidth = 2 * S;
     b.strokeStyle = 'rgba(255,255,255,0.35)';
@@ -288,6 +303,7 @@
         if (pendingImg) pendingImg.addEventListener('load', buildDecorations, { once: true });
         return;
       }
+      if (FishObjects.OBJECTS[o.t] && FishObjects.OBJECTS[o.t].live) return; // 會動的（海草）每幀畫
       FishObjects.drawObject(b, o, x, y, k, im, i * 7919 + 13);
       const kind = FishObjects.OBJECTS[o.t];
       for (const [ex, ey] of (kind && kind.emit) || []) emitters.push({ x: x + (o.f ? -ex : ex) * k, y: y + ey * k, kind: kind.fast ? 'bubbler' : o.t === 'chest' ? 'chest' : 'door' });
@@ -298,6 +314,10 @@
   function hexRgb(h) {
     const n = parseInt(h.slice(1), 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgba(hex, a) {
+    const [r, g, b] = hexRgb(C.hex6(hex) || '#ffffff');
+    return `rgba(${r},${g},${b},${a})`;
   }
   function shade(hex, amt) { // amt > 0 變亮、< 0 變暗
     const [r, g, bl] = hexRgb(hex);
@@ -400,7 +420,7 @@
     f.retarget = rand(4, 9);
   }
 
-  function speak(f, text, sec = 6, max = 28) {
+  function speak(f, text, sec = opt.ui.bsec, max = 28) {
     let t = String(text).replace(/\s+/g, ' ').trim();
     if (!t) return;
     if ([...t].length > max) t = [...t].slice(0, max - 1).join('') + '…';
@@ -418,17 +438,17 @@
   function unlockRare(f, want, reason) {
     const id = C.pickRare(f.unlocked, want);
     if (!id) {
-      f.size = Math.min(2, f.size + 0.2);
+      f.size = Math.min(opt.ui.maxsize, f.size + 0.2);
       poof(f);
       saveProfile(f);
-      banner(`${f.display} ${reason}，稀有魚種都收集齊了，直接變大！`);
+      banner(C.fillText(opt.ui.x_allrare, { 名字: f.display, 原因: reason }));
       return;
     }
     f.unlocked.push(id);
     f.species = id;
     poof(f);
     saveProfile(f);
-    banner(`${f.display} ${reason}，解鎖稀有魚種「${C.SPECIES[id].name}」！`);
+    banner(C.fillText(opt.ui.x_unlock, { 名字: f.display, 原因: reason, 魚種: C.SPECIES[id].name }));
   }
 
   function ensureFish(msg) {
@@ -471,13 +491,13 @@
       return;
     }
 
-    const cmd = C.parseCommand(msg.text, opt.skins);
+    const cmd = C.parseCommand(msg.text, opt.skins, opt.aliases);
     if (cmd && cmd.cmd === 'tank') {
       if (badges.broadcaster || badges.mod) tankCommand(cmd.arg);
       return;
     }
     if (cmd && cmd.cmd === 'help') {
-      if (C.cooldownOk(cool, '*', 'help', now)) showHelp();
+      if (C.cooldownOk(cool, '*', 'help', now, Math.max(0.2, opt.ui.cd))) showHelp();
       return;
     }
 
@@ -497,16 +517,16 @@
       if (opt.say) speak(f, msg.text);
       return;
     }
-    if (!C.cooldownOk(cool, f.login, cmd.cmd, now)) return;
+    if (!C.cooldownOk(cool, f.login, cmd.cmd, now, opt.ui.cd)) return;
     const wake = () => { if (f.state === 'sleep') setState(f, 'swim', 0); };
 
     switch (cmd.cmd) {
       case 'join':
-        speak(f, '我在這裡！');
+        speak(f, opt.ui.x_join);
         break;
       case 'leave':
         f.leaving = true;
-        speak(f, '掰掰～');
+        speak(f, opt.ui.x_leave);
         break;
       case 'skin': {
         let id = findSkin(cmd.arg);
@@ -741,29 +761,31 @@
   function startEvent(type, by) {
     if (ev && ev.type !== 'school' && type !== 'school') return; // 一次一個（魚群可以疊）
     const who = by && by.display ? by.display : '';
+    const byText = who ? C.fillText(opt.ui.x_by, { 名字: who }) : '';
     if (type === 'shark') {
       const dir = Math.random() < 0.5 ? 1 : -1;
-      ev = { type, t: 0, dir, x: dir > 0 ? X0 - 260 * S : X1 + 260 * S, y: rand(surfaceY + 120 * S, floorY - 120 * S), L: 230 * S, chomped: 0, tail: 0 };
-      banner(`鯊魚出沒！快逃！${who ? `（${who} 叫來的）` : ''}`);
+      const L = 230 * S * opt.ui.shs;
+      ev = { type, t: 0, dir, x: dir > 0 ? X0 - L * 1.2 : X1 + L * 1.2, y: rand(surfaceY + 120 * S, floorY - 120 * S), L, chomped: 0, tail: 0 };
+      banner(opt.ui.x_shark + byText);
     } else if (type === 'whirl') {
-      ev = { type, t: 0, dur: 8, cx: X0 + TW / 2, cy: (surfaceY + floorY) / 2 };
-      banner(`大漩渦來了！${who ? `（${who} 攪的）` : ''}`);
+      ev = { type, t: 0, dur: opt.ui.whirl, cx: X0 + TW / 2, cy: (surfaceY + floorY) / 2 };
+      banner(opt.ui.x_whirl + byText);
     } else if (type === 'treasure') {
       ev = { type, t: 0, x: rx(0.15, 0.85), y: surfaceY - 20 * S, landed: false };
-      banner(`寶箱掉下來了！第一隻碰到的魚解鎖稀有魚種！${who ? `（${who} 丟的）` : ''}`);
+      banner(opt.ui.x_treasure + byText);
     } else if (type === 'school') {
       const n = clamp(Math.round((by && by.viewers ? by.viewers : 20) / 2), 8, 40);
       const dir = Math.random() < 0.5 ? 1 : -1;
       const cy = rand(surfaceY + 100 * S, floorY - 100 * S);
       const school = [];
       for (let i = 0; i < n; i++) {
-        school.push({ x: (dir > 0 ? X0 - 80 * S : X1 + 80 * S) - dir * rand(0, 360) * S, y: cy + rand(-90, 90) * S, ph: rand(0, TAU), c: hslHex(rand(0, 360), 80, 62) });
+        school.push({ x: (dir > 0 ? X0 - 80 * S : X1 + 80 * S) - dir * rand(0, 360) * S, y: cy + rand(-90, 90) * S, ph: rand(0, TAU), c: opt.ui.scc || hslHex(rand(0, 360), 80, 62) });
       }
       schools.push({ dir, list: school, t: 0 });
       if (by && by.login) {
         const f = ensureFish(by);
         unlockRare(f, 'whale', `帶著 ${by.viewers || 0} 位觀眾揪團進來`);
-      } else banner('一大群魚游過去了！');
+      } else banner(opt.ui.x_school);
     }
   }
   const schools = [];
@@ -771,7 +793,8 @@
   function updateEvent(dt) {
     if (now > nextEvent) {
       nextEvent = now + opt.event * 60000 * rand(0.7, 1.3);
-      if (!ev && fishes.size >= 3) startEvent(['shark', 'whirl', 'treasure'][Math.floor(Math.random() * 3)]);
+      const pool = opt.ui.ev;
+      if (!ev && fishes.size >= 3 && pool.length) startEvent(pool[Math.floor(Math.random() * pool.length)]);
     }
     for (let i = schools.length - 1; i >= 0; i--) {
       const sc = schools[i];
@@ -785,7 +808,7 @@
     if (!ev) return;
     ev.t += dt;
     if (ev.type === 'shark') {
-      ev.x += ev.dir * 260 * S * dt;
+      ev.x += ev.dir * 260 * S * opt.ui.shsp * dt;
       ev.y += Math.sin(ev.t * 1.5) * 30 * S * dt;
       ev.tail += dt * 10;
       for (const f of fishes.values()) {
@@ -796,17 +819,17 @@
           f.flee = 1.2;
           f.fleeX = ev.x;
           f.fleeY = ev.y;
-          if (d < ev.L * 0.35 && ev.chomped < 3 && !f.chomped) {
+          if (d < ev.L * 0.35 && ev.chomped < opt.ui.chomp && !f.chomped) {
             f.chomped = true;
             ev.chomped++;
             jump(f);
             f.spin = 0;
-            speak(f, ['救命啊！', '差點被吃掉', '嚇死我了', '我不好吃！'][Math.floor(Math.random() * 4)], 4);
+            speak(f, C.pickLine(opt.ui.x_scream), 4);
             splash(f.x, f.y, 8);
           }
         }
       }
-      if ((ev.dir > 0 && ev.x > X1 + 300 * S) || (ev.dir < 0 && ev.x < X0 - 300 * S)) {
+      if ((ev.dir > 0 && ev.x > X1 + ev.L * 1.3) || (ev.dir < 0 && ev.x < X0 - ev.L * 1.3)) {
         for (const f of fishes.values()) f.chomped = false;
         ev = null;
       }
@@ -814,7 +837,7 @@
       if (ev.t > ev.dur) {
         for (const f of fishes.values()) {
           if (f.state === 'whirl') setState(f, 'swim', 0);
-          if (Math.random() < 0.4) speak(f, ['頭好暈 @_@', '再來一次！', '嘔…', '好好玩'][Math.floor(Math.random() * 4)], 3);
+          if (Math.random() < 0.4) speak(f, C.pickLine(opt.ui.x_dizzy), 3);
         }
         ev = null;
       }
@@ -832,7 +855,7 @@
           return;
         }
       }
-      if (ev.t > 40) { banner('寶箱沉到沙裡不見了…'); ev = null; }
+      if (ev.t > opt.ui.tsec) { banner(opt.ui.x_lost); ev = null; }
     }
   }
 
@@ -929,9 +952,9 @@
   function updateFish(f, dt, t) {
     const sp = spec(f.species);
     const L = bodyLen(f);
-    const base = sp.speed * S * (0.9 + f.size * 0.1);
+    const base = sp.speed * S * (0.9 + f.size * 0.1) * opt.ui.spd;
     const idleMs = opt.idle * 60000;
-    if (!f.leaving && now - f.last > idleMs) { f.leaving = true; speak(f, '去睡囉 zzz'); }
+    if (!f.leaving && now - f.last > idleMs) { f.leaving = true; speak(f, opt.ui.x_idle); }
 
     f.alpha = clamp(f.alpha + (f.leaving ? -0.6 : 2) * dt, 0, 1);
     if (f.leaving && f.alpha <= 0) { fishes.delete(f.login); return; }
@@ -1035,7 +1058,7 @@
             tx = p.x; ty = p.y; speed = base * 1.8;
             if (Math.hypot(p.x - f.x, p.y - f.y) < L * 0.5) { // 碰到身體就算吃到（只看嘴巴的話，魚停在飼料正上方會一直吃不到）
               food.splice(food.indexOf(p), 1);
-              f.size = Math.min(2, f.size + 0.04);
+              f.size = Math.min(opt.ui.maxsize, f.size + opt.ui.grow);
               saveProfile(f);
               parts.push({ k: 'text', t: '+', color: '#ffe680', x: f.x, y: f.y - L * 0.4, vx: 0, vy: -40 * S, r: 16 * S, life: 0, max: 0.8 });
             }
@@ -1099,6 +1122,11 @@
     }
     drawSurface(t);
     for (const w of seaweed) drawSeaweed(w, t);
+    objects.forEach((o, i) => { // 擺放的海草
+      if (o.t !== 'seaweed') return;
+      const { x, y, k } = objectPlace(o);
+      drawSeaweed({ x, base: y, h: 160 * k, seg: 7, ph: i * 1.7, w: 8 * k, color: o.c || FishObjects.OBJECTS.seaweed.color, flip: o.f }, t);
+    });
     if (decoLayer) ctx.drawImage(decoLayer, 0, 0, W, H);
     // 魚、鯊魚、魚群只畫在水族箱左右邊界內（游出去就消失）；往上跳可以跳出魚缸
     ctx.save();
@@ -1165,7 +1193,7 @@
     ctx.save();
     ctx.strokeStyle = w.color;
     ctx.lineCap = 'round';
-    let x = w.x, y = floorY + 8 * S;
+    let x = w.x, y = w.base === undefined ? floorY + 8 * S : w.base;
     for (let i = 0; i < w.seg; i++) {
       const k = i / w.seg;
       const nx = w.x + Math.sin(t * 1.2 + w.ph + i * 0.6) * 10 * S * k * 2;
@@ -1185,7 +1213,7 @@
     ctx.save();
     ctx.translate(ev.cx, ev.cy);
     ctx.scale(1, 0.55);
-    ctx.strokeStyle = `rgba(210,240,255,${0.35 * a})`;
+    ctx.strokeStyle = rgba(opt.ui.whc, 0.35 * a);
     ctx.lineWidth = 3 * S;
     for (let k = 0; k < 4; k++) {
       ctx.beginPath();
@@ -1206,7 +1234,7 @@
     if (!ev.landed) ctx.rotate(Math.sin(t * 3) * 0.2);
     ctx.shadowColor = '#ffd23f';
     ctx.shadowBlur = (16 + Math.sin(t * 6) * 6) * s;
-    ctx.fillStyle = '#a8662e';
+    ctx.fillStyle = opt.ui.trc;
     ctx.fillRect(-22 * s, -14 * s, 44 * s, 28 * s);
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#7a4a22';
@@ -1247,7 +1275,7 @@
     ctx.translate(ev.x, ev.y);
     ctx.scale(ev.dir, 1);
     ctx.rotate(Math.sin(ev.t * 1.5) * 0.06);
-    drawShark(ev.L, '#5d7286', Math.sin(ev.tail) * ev.L * 0.06, { state: 'swim' }, true);
+    drawShark(ev.L, opt.ui.shc, Math.sin(ev.tail) * ev.L * 0.06, { state: 'swim' }, true);
     ctx.restore();
   }
 
@@ -1287,7 +1315,7 @@
     } else if (p.k === 'text') {
       ctx.globalAlpha = Math.min(1, a * 1.5);
       ctx.fillStyle = p.color;
-      ctx.font = `700 ${p.r}px "Noto Sans TC", system-ui, sans-serif`;
+      ctx.font = `700 ${p.r}px ${font()}`;
       ctx.textAlign = 'center';
       ctx.fillText(p.t, p.x, p.y);
     }
@@ -2006,13 +2034,14 @@
     ctx.lineJoin = 'round';
 
     // 泡泡
-    ctx.font = `600 ${Math.round(15 * S)}px "Noto Sans TC", system-ui, sans-serif`;
+    const bs = opt.ui.bsize / 15; // 泡泡字大小（1 = 預設）
+    ctx.font = `600 ${Math.round(opt.ui.bsize * S)}px ${font()}`;
     const talkers = list.filter((f) => f.sayT > 0 && f.say).sort((a, b) => b.sayAt - a.sayAt);
     let shown = 0;
     for (const f of talkers) {
-      if (shown >= MAX_BUBBLES) break;
+      if (shown >= opt.ui.nbub) break;
       const tw = ctx.measureText(f.say).width;
-      const bw = tw + 18 * S, bh = 26 * S;
+      const bw = tw + 18 * S * bs, bh = 26 * S * bs;
       const bx = clamp(f.x - bw / 2, 4, W - bw - 4);
       const baseY = f.y - extent(f, TOP) - bh - 10 * S;
       // 先試上次的位置（避免跳來跳去），再往上疊
@@ -2026,7 +2055,7 @@
       shown++;
       const by = box.y;
       ctx.globalAlpha = f.alpha * Math.min(1, f.sayT / 0.5);
-      ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      ctx.fillStyle = rgba(opt.ui.bbg, 0.94);
       ctx.beginPath();
       ctx.roundRect(bx, by, bw, bh, 10 * S);
       ctx.fill();
@@ -2045,31 +2074,32 @@
         ctx.lineTo(f.x, f.y - extent(f, TOP));
         ctx.stroke();
       }
-      ctx.fillStyle = '#1b2733';
+      ctx.fillStyle = opt.ui.btext;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(f.say, bx + bw / 2, by + bh / 2 + 1);
     }
 
     // 名字：有徽章的、最近講過話的優先
-    ctx.font = `700 ${Math.round(13 * S)}px "Noto Sans TC", system-ui, sans-serif`;
+    const ns = opt.ui.nsize / 13; // 名字大小（1 = 預設）
+    ctx.font = `700 ${Math.round(opt.ui.nsize * S)}px ${font()}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.lineWidth = 3.5 * S;
-    ctx.strokeStyle = 'rgba(0,20,40,0.85)';
+    ctx.lineWidth = 3.5 * S * ns;
+    ctx.strokeStyle = rgba(opt.ui.nline, 0.85);
     const rank = (f) => (f.badges.broadcaster ? 4 : f.badges.mod ? 3 : f.badges.vip || f.badges.sub ? 2 : 0) * 1e9 + f.last;
     for (const f of [...list].sort((a, b) => rank(b) - rank(a))) {
       if (f.tag === 'hide') continue; // 觀眾自己把名牌藏起來
       const name = badgeIcon(f.badges) + f.display;
       const w = ctx.measureText(name).width + 6 * S;
-      const r = { x: f.x - w / 2, y: f.y + extent(f, BOTTOM) + 4 * S, w, h: 16 * S };
+      const r = { x: f.x - w / 2, y: f.y + extent(f, BOTTOM) + 4 * S, w, h: 16 * S * ns };
       const free = !hit(r);
       f.nameA += ((free ? 1 : 0) - f.nameA) * fadeStep;
       if (free) placed.push(r);
       if (f.nameA < 0.03) continue;
       ctx.globalAlpha = f.alpha * f.nameA;
       ctx.strokeText(name, f.x, r.y);
-      ctx.fillStyle = f.tag || '#fff';
+      ctx.fillStyle = f.tag || opt.ui.ncolor;
       ctx.fillText(name, f.x, r.y);
     }
     ctx.restore();
@@ -2083,12 +2113,83 @@
     clearTimeout(helpTimer);
     helpTimer = setTimeout(() => helpEl.classList.remove('show'), 12000);
   }
-  const rareLine = document.getElementById('help-rare');
-  if (rareLine) rareLine.textContent = rareHint();
+  // 「{跳}」→「!跳」（目前的叫法）；那個指令被關掉就回傳 null，整句提示不顯示
+  const DEFAULT_WORD = {}; // 預設叫法 → 指令
+  for (const [cmd, info] of Object.entries(C.CMD_INFO)) DEFAULT_WORD[info.words[0]] = cmd;
+  const cmdWord = (cmd) => '!' + ((opt.words[cmd] || C.CMD_INFO[cmd].words)[0]);
+  function fillCmds(text) {
+    let off = false;
+    const out = String(text).replace(/\{([^{}]+)\}/g, (all, k) => {
+      if (k === '稀有') return rareHint();
+      const cmd = DEFAULT_WORD[k];
+      if (!cmd) return all;
+      if (opt.off.includes(cmd)) off = true;
+      return cmdWord(cmd);
+    });
+    return off ? null : out;
+  }
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  // 指令（!開頭的字）加粗上色
+  const boldCmds = (t) => esc(t).replace(/![^\s，、。！？：；()（）]+/g, (m) => `<b>${m}</b>`);
+  // 說明卡：每個沒關掉的指令一行
+  const HELP_ROWS = [
+    ['join', '{魚}', '變成一隻魚加入'],
+    ['skin', '!鯊魚 !河豚 !水母 !金魚 !小丑魚 !神仙魚', '換魚種'],
+    ['skin', '!鯨魚 !獨角鯨 !錦鯉', '稀有魚種：{稀有}'],
+    ['color', '{顏色} 紅／彩虹／#66ccff', '換顏色'],
+    ['jump', '{跳} {衝} {轉} {睡} {泡泡}', '做動作'],
+    ['feed', '{餵}　{餵} @名字　{餵} 大家', '餵自己／請別人／全場吃飼料'],
+    ['avatar', '{頭像} 表情符號', '把頭像放到魚身上'],
+    ['wear', '{戴} 皇冠　{花紋} 星星　{配件色} 粉', '配件、花紋與配件顏色'],
+    ['face', '{副色} 藍　{大小} 大　{表情} 開心　{名牌} 粉', '第二顏色、大小、表情、名牌'],
+    ['hug', '{抱} @名字　{跟} @名字', '找別人互動'],
+    ['leave', '{離開}', '游走'],
+  ];
+  function buildTexts() {
+    document.querySelector('#help h2').textContent = opt.ui.x_help;
+    const dl = document.querySelector('#help dl');
+    dl.innerHTML = '';
+    const rows = HELP_ROWS.slice();
+    if (opt.skins.length) rows.splice(2, 0, ['skin', opt.skins.map((k) => '!' + k.name).join(' '), '本頻道限定魚種']);
+    for (const [cmd, words, what] of rows) {
+      if (opt.off.includes(cmd)) continue;
+      const w = fillCmds(words), d = fillCmds(what);
+      if (w === null || d === null) continue;
+      const dt = document.createElement('dt');
+      dt.textContent = w;
+      const dd = document.createElement('dd');
+      dd.textContent = d;
+      dl.append(dt, dd);
+    }
+    tips = String(opt.ui.x_tips).split('|').map(fillCmds).filter((t) => t && t.trim()).map(boldCmds);
+    if (opt.skins.length) tips.splice(2, 0, boldCmds('本頻道限定魚種：' + opt.skins.map((k) => '!' + k.name).join(' ')));
+  }
+
+  // 顏色與字型：CSS 變數給橫幅、提示、說明卡用
+  let fontLink = null;
+  function applyStyle() {
+    const u = opt.ui, r = document.documentElement.style;
+    r.setProperty('--font', font());
+    r.setProperty('--banner-a', u.gbg);
+    r.setProperty('--banner-b', u.gbg2);
+    r.setProperty('--banner-text', u.gtext);
+    r.setProperty('--panel-bg', rgba(u.tbg, 0.78));
+    r.setProperty('--panel-bg-strong', rgba(u.tbg, 0.92));
+    r.setProperty('--panel-text', u.ttext);
+    r.setProperty('--panel-key', u.tkey);
+    const want = FONT_URL[u.font];
+    if (want && (!fontLink || fontLink.dataset.font !== u.font)) {
+      fontLink = fontLink || document.head.appendChild(document.createElement('link'));
+      fontLink.rel = 'stylesheet';
+      fontLink.dataset.font = u.font;
+      fontLink.href = `https://fonts.googleapis.com/css2?family=${want}&display=swap`;
+    }
+  }
 
   const bannerEl = document.getElementById('banner');
   let bannerTimer = 0;
   function banner(text) {
+    if (!text) return;
     bannerEl.textContent = text;
     bannerEl.classList.remove('show');
     void bannerEl.offsetWidth; // 重播動畫
@@ -2097,37 +2198,19 @@
     bannerTimer = setTimeout(() => bannerEl.classList.remove('show'), 5500);
   }
 
-  const TIPS = [
-    '在聊天室輸入 <b>!魚</b> 加入水族箱',
-    '<b>!鯊魚</b> <b>!河豚</b> <b>!水母</b> <b>!小丑魚</b> 換魚種',
-    '<b>!顏色 粉</b>、<b>!顏色 彩虹</b>、<b>!顏色 #66ccff</b> 換顏色',
-    '<b>!跳</b> <b>!衝</b> <b>!轉</b> <b>!睡</b> <b>!泡泡</b> 做動作',
-    '<b>!餵</b> 自己吃、<b>!餵 @名字</b> 請別人吃、<b>!餵 大家</b> 全場吃',
-    '<b>!頭像</b> 加一個表情符號，把它放到魚身上' + (opt.pfp ? '；<b>!頭像 大頭貼</b> 用 Twitch 大頭貼' : ''),
-    '<b>!戴 皇冠</b>、<b>!花紋 星星</b>、<b>!副色 藍</b>、<b>!配件色 粉</b> 打扮自己的魚',
-    '<b>!表情 開心</b>、<b>!大小 大</b>、<b>!名牌 粉</b>（<b>!名牌 隱藏</b> 把名字藏起來）',
-    '<b>!抱 @名字</b> 抱抱、<b>!跟 @名字</b> 跟著游',
-    `稀有魚種 <b>鯨魚</b> <b>獨角鯨</b> <b>錦鯉</b>：${rareHint()}`,
-  ];
-  if (opt.skins.length) {
-    const names = opt.skins.map((k) => '!' + k.name);
-    TIPS.splice(2, 0, '本頻道限定魚種：' + names.map((n) => `<b>${n.replace(/</g, '&lt;')}</b>`).join(' '));
-    const dt = document.createElement('dt');
-    dt.textContent = names.join(' ');
-    const dd = document.createElement('dd');
-    dd.textContent = '本頻道限定魚種';
-    document.querySelector('#help dl').insertBefore(dd, document.querySelector('#help dl dt:nth-of-type(3)'));
-    document.querySelector('#help dl').insertBefore(dt, dd);
-  }
+  let tips = [];
   const tipEl = document.getElementById('tip');
-  if (opt.tip) {
-    let i = 0;
-    const next = () => {
-      tipEl.classList.remove('show');
-      setTimeout(() => { tipEl.innerHTML = TIPS[i++ % TIPS.length]; tipEl.classList.add('show'); }, 500);
-    };
-    next();
-    setInterval(next, 9000);
+  let tipIndex = 0;
+  setInterval(() => {
+    if (!opt.tip || !tips.length) { tipEl.classList.remove('show'); return; }
+    tipEl.classList.remove('show');
+    setTimeout(() => { tipEl.innerHTML = tips[tipIndex++ % tips.length]; tipEl.classList.add('show'); }, 500);
+  }, 9000);
+  function showTipNow() {
+    if (!opt.tip || !tips.length) return;
+    tipEl.innerHTML = tips[0];
+    tipIndex = 1;
+    tipEl.classList.add('show');
   }
 
   // ───────── 狀態提示 ─────────
@@ -2191,14 +2274,76 @@
   // ───────── 啟動 ─────────
   window.addEventListener('resize', resize);
   resize();
+  applyStyle();
+  buildTexts();
+  showTipNow();
   if (opt.demo) setupDemo();
-  if (opt.channel) {
-    connectChat(opt.channel, handleChat, (s) => {
-      if (s === 'joined') status(`已連上 #${opt.channel} 聊天室`);
-      else if (s === 'closed') status('聊天室斷線，重新連線中…', true);
-    });
-  } else if (!opt.demo) {
-    status('網址少了 ?channel=你的頻道名稱', true);
+  let chatConn = null, chatFor = '';
+  function connect() {
+    if (opt.channel === chatFor) return;
+    if (chatConn) chatConn.stop();
+    chatConn = null;
+    chatFor = opt.channel;
+    if (opt.channel) {
+      chatConn = connectChat(opt.channel, handleChat, (s) => {
+        if (s === 'joined') status(`已連上 #${opt.channel} 聊天室`);
+        else if (s === 'closed') status('聊天室斷線，重新連線中…', true);
+      });
+    } else if (!opt.demo) {
+      status('網址少了 ?channel=你的頻道名稱', true);
+    }
+  }
+  connect();
+
+  // ───────── 即時同步：設定頁改了設定，這裡馬上套用（不用重新複製網址、不用重新整理 OBS） ─────────
+  // 換成新的設定：魚留著，背景、物件、文字、顏色重畫
+  function applyOptions(search) {
+    const n = C.readOptions(search);
+    for (const k of Object.keys(n)) if (!['demo', 'edit', 'store', 'skey', 'room', 'key'].includes(k)) opt[k] = n[k];
+    for (const k of Object.keys(SKIN)) if (!SKIN[k].owner) delete SKIN[k];
+    for (const k of opt.skins) SKIN[k.id] = { name: k.name, url: k.url, color: '#ffffff', scale: 1.15, speed: 50, custom: true };
+    for (const f of fishes.values()) if (!C.SPECIES[f.species] && !SKIN[f.species]) f.species = C.defaultSpecies(f.login); // 被拿掉的自訂魚種
+    objects.splice(0, objects.length, ...opt.objects.map((o) => ({ ...o })));
+    selected = -1;
+    if (nextEvent !== Infinity || opt.event > 0) nextEvent = opt.event > 0 ? now + opt.event * 60000 * rand(0.7, 1.3) : Infinity;
+    resize();
+    applyStyle();
+    buildTexts();
+    showTipNow();
+    connect();
+  }
+  const live = { clients: [], bc: null, seen: new Set(), last: 0 };
+  async function liveSend(msg) {
+    if (!opt.room || !opt.key) return;
+    const signed = await C.signMessage(opt.key, { ...msg, mid: Math.random().toString(36).slice(2) });
+    live.seen.add(signed.mid);
+    if (live.bc) live.bc.postMessage(signed);
+    for (const c of live.clients) if (c.connected) c.publish('fishtank/' + opt.room, JSON.stringify(signed));
+  }
+  async function liveRecv(msg) {
+    if (!msg || msg.type !== 'cfg' || live.seen.has(msg.mid)) return;
+    live.seen.add(msg.mid);
+    if (!(await C.verifyMessage(opt.key, msg))) return; // 暗號不對：不是自己的設定頁送的，丟掉
+    if (msg.ts <= live.last) return; // 舊的訊息
+    live.last = msg.ts;
+    applyOptions(mergeLive(msg.q));
+    try { localStorage.setItem(LIVE_STORE, JSON.stringify({ q: msg.q, ts: msg.ts })); } catch { /* 存不了就算了 */ }
+    liveSend({ type: 'ack' });
+  }
+  if (opt.room && opt.key && !opt.demo) {
+    // 同一個瀏覽器（OBS 自訂面板）走 BroadcastChannel；不同瀏覽器（Chrome 設定頁 → OBS）走公開的 MQTT 中繼伺服器
+    try { live.bc = new BroadcastChannel('fishtank:' + opt.room); live.bc.onmessage = (e) => liveRecv(e.data); } catch { /* 不支援 */ }
+    if (window.mqtt) {
+      for (const [i, url] of ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'].entries()) {
+        try {
+          const c = mqtt.connect(url, { clientId: `ft_${Math.random().toString(36).slice(2, 10)}_${i}`, reconnectPeriod: 3000, connectTimeout: 8000, clean: true });
+          c.on('connect', () => { c.subscribe('fishtank/' + opt.room); liveSend({ type: 'hello' }); });
+          c.on('message', (t, buf) => { try { liveRecv(JSON.parse(buf.toString())); } catch { /* 格式不對 */ } });
+          live.clients.push(c);
+        } catch { /* 這台連不上就算了 */ }
+      }
+    }
+    liveSend({ type: 'hello' }); // 跟設定頁說「我開著」，設定頁會把目前的設定送過來
   }
   if (opt.store) {
     cloudLoad();
@@ -2289,7 +2434,8 @@
   // 方便除錯與自動測試：advance(秒) 直接快轉模擬，不用真的等
   if (opt.edit) setupEditor();
   window.FishTank = {
-    handleChat, startEvent, fishes, opt, objects,
+    handleChat, startEvent, fishes, opt, objects, applyOptions,
+    tips: () => tips.slice(),
     // 設定頁改了物件（加、刪、改大小顏色）：整份換掉重畫
     setObjects(list, sel = selected) {
       objects.splice(0, objects.length, ...list.map((o) => ({ ...o })));
@@ -2301,6 +2447,6 @@
       for (let i = 0; i < sec * 60; i++) { skew += 1000 / 60; now = performance.now() + skew; update(1 / 60); }
       draw();
     },
-    peek: () => ({ ev: ev && ev.type, food: food.length, foodOwners: food.map((p) => p.owner || '*'), seaweed: seaweed.length, pending: [...pending.keys()], schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
+    peek: () => ({ ev: ev && ev.type, evDur: ev && ev.dur, food: food.length, foodOwners: food.map((p) => p.owner || '*'), seaweed: seaweed.length, pending: [...pending.keys()], schools: schools.length, area: { X0, X1, Y0, Y1, surfaceY, floorY }, banner: bannerEl.textContent, placed: lastPlaced }),
   };
 })();

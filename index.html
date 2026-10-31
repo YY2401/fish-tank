@@ -40,6 +40,37 @@
   .area { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
   .area label { margin-bottom: 6px; }
   .area input { width: 100%; }
+  .quick { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; background: #10466d; border: 1px solid #2a6a96; border-radius: 12px; padding: 12px 16px; }
+  .quick b { color: var(--accent); }
+  .quick .step { background: #1d5277; color: var(--text); font-weight: 700; }
+  .quick .step:hover { background: #2a6a96; }
+  .flash { animation: flash 1.4s ease-out; }
+  @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .quick em { flex-basis: 100%; }
+  details.sec > summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary h2 { margin: 0; }
+  details.sec > summary h2::before { content: ''; display: inline-block; width: 0; height: 0; margin-right: 8px; vertical-align: middle; border: 6px solid transparent; border-left-color: var(--muted); transform: translateX(3px); transition: transform .15s; }
+  details.sec[open] > summary h2::before { transform: translate(0, 3px) rotate(90deg); }
+  details.sec > summary em { grid-column: 1 / -1; }
+  details.sec[open] > summary { margin-bottom: 12px; }
+  .changed { color: var(--accent); font-size: 12px; align-self: center; }
+  .gen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .gen .wide { grid-column: 1 / -1; }
+  .gen label { margin: 0; }
+  .gen label > span { font-size: 13px; }
+  .gen textarea { width: 100%; min-height: 70px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: #071c2e; color: var(--text); font: 13px/1.5 inherit; resize: vertical; }
+  .gen .multi { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .gen .multi label { display: flex; gap: 6px; align-items: center; }
+  .gen input[type=range] { width: 100%; }
+  .reset { margin-top: 12px; text-align: right; }
+  .reset button { font-size: 12px; padding: 4px 10px; }
+  .cmds { display: grid; gap: 4px; }
+  .cmd { display: grid; grid-template-columns: 22px 92px 1fr; gap: 6px; align-items: center; }
+  .cmd input[type=text] { padding: 5px 8px; font-size: 13px; }
+  .cmd.off input[type=text] { opacity: .45; }
+  .cmd span { font-size: 13px; }
+  .live { margin: 12px 0 4px; }
   .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 10px; }
   .theme { padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; color: var(--text); font-weight: 500; font-size: 12px; }
   .theme i { display: block; height: 30px; }
@@ -63,6 +94,7 @@
   .obj-palette button, .obj-palette label { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; margin: 0; border-radius: 8px; background: #071c2e; color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer; }
   .obj-palette canvas { width: 64px; height: 48px; }
   .obj-palette .up { justify-content: center; min-height: 64px; border: 1px dashed var(--line); }
+  .obj-panel[hidden], .colors[hidden] { display: none !important; }
   .obj-panel { background: #071c2e; border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
   .obj-row { display: flex; gap: 10px; align-items: center; margin: 0; }
   .obj-row > span { flex: none; min-width: 3.5em; font-size: 13px; }
@@ -97,10 +129,18 @@
 <body>
 <main>
   <h1>直播水族箱 <small>觀眾在聊天室打指令，就會變成魚在你的直播畫面裡游泳</small></h1>
+  <div class="quick">
+    <b>第一次用，三步驟就好：</b>
+    <button type="button" class="step" data-go="channel">1. 填頻道名稱</button>
+    <button type="button" class="step" data-go="themes">2. 點一個喜歡的配色</button>
+    <button type="button" class="step" data-go="copy">3. 按「複製」，貼到 OBS 的瀏覽器來源</button>
+    <em>其他設定都有預設值，之後想調再打開來改就好。</em>
+  </div>
 
   <div class="left">
-    <section>
-      <h2>1. 基本設定</h2>
+    <section id="secBasic">
+      <details class="sec" open>
+      <summary><h2>1. 基本設定</h2><span class="changed"></span><em>填頻道名稱、選背景與水族箱的位置</em></summary>
       <label><span>Twitch 頻道名稱</span><input type="text" id="channel" placeholder="例如 yy2401"><em>網址 twitch.tv/ 後面那段，不用登入</em></label>
       <label class="check"><input type="checkbox" id="auto" checked><div><span>講話就自動變成魚</span><em>關掉的話要打 !魚 才會加入</em></div></label>
       <label class="check"><input type="checkbox" id="say" checked><div><span>魚頭上顯示聊天內容</span></div></label>
@@ -126,10 +166,13 @@
       <label><span>魚的大小：<b id="scaleV"></b></span><input type="range" id="scale" min="0.5" max="2" step="0.1" value="1"></label>
       <label><span>最多幾隻魚</span><input type="number" id="max" min="1" max="200" value="60"></label>
       <label><span>幾分鐘沒講話就游走</span><input type="number" id="idle" min="1" max="240" value="20"></label>
+
+      </details>
     </section>
 
-    <section>
-      <h2>2. 魚缸外觀與大事件</h2>
+    <section id="secLook">
+      <details class="sec">
+      <summary><h2>2. 外觀與配色</h2><span class="changed"></span><em>配色、自己選顏色、海草、背景圖片、魚缸外框</em></summary>
       <div class="lbl">配色（背景選「完整水族箱」時才有）</div>
       <div class="themes" id="themes"></div>
       <label class="check"><input type="checkbox" id="customColor"><div><span>自己選顏色</span></div></label>
@@ -139,12 +182,15 @@
       <label><span>海草</span><select id="weed"><option value="0">沒有</option><option value="1" selected>一般</option><option value="2">多</option><option value="3">很多</option></select></label>
       <label><span>背景圖片（選用）</span><input type="text" id="bgimg" placeholder="圖片網址 https://…，留空就用上面的配色"><em>想用自己的背景圖：把圖放在能公開看的地方（例如 Imgur、Discord），貼上圖片網址</em></label>
       <div class="lbl" id="decoLbl">魚缸物件</div>
-      <em>城堡、沉船、珊瑚、海星…在右邊預覽<b>下面的「魚缸物件」</b>加，直接在預覽上拖曳位置、調大小與顏色。</em>
-      <label><span>每幾分鐘隨機來一次大事件</span><input type="number" id="event" min="0" max="240" value="15"><em>鯊魚出沒、大漩渦、寶箱掉落輪流來；填 0 關掉。實況主或管理員也可以打 !tank shark／whirl／treasure 手動叫</em></label>
+      <em>城堡、沉船、海草、海星…在右邊預覽<b>下面的「魚缸物件」</b>加，直接在預覽上拖曳位置、調大小與顏色。</em>
+      <div class="gen" data-group="look"></div>
+
+      </details>
     </section>
 
-    <section>
-      <h2>3. 自訂魚種與觀眾外觀</h2>
+    <section id="secSkins">
+      <details class="sec">
+      <summary><h2>3. 自訂魚種與觀眾外觀</h2><span class="changed"></span><em>上傳本頻道限定魚種、觀眾頭像與打扮</em></summary>
       <div class="lbl">本頻道限定魚種</div>
       <em>取個名字、按「上傳」選一張圖，觀眾打 <b>!名字</b> 就會變成這張圖游來游去。建議用<b>透明背景、魚頭朝右</b>的 PNG。</em>
       <div class="skins" id="skins"></div>
@@ -162,10 +208,13 @@
       <div class="lbl" id="wearLbl" style="margin-top:14px">觀眾自己打扮</div>
       <em>觀眾可以隨時用 <b>!戴 帽子／皇冠／眼鏡／蝴蝶結／海盜帽／花／耳機／光環</b> 和 <b>!花紋 條紋／斑點／星星／愛心</b>，跟魚種、顏色、頭像自由搭配，不用設定。</em>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="submit" checked><div><span>觀眾可以提交自己的魚圖片</span><em>觀眾打 <b>!我的魚 圖片網址</b>，<b>要等實況主或管理員打 !tank ok @名字</b> 才會出現在畫面上（!tank no @名字 退回）。核准前請先點開網址看過圖片。</em></div></label>
+
+      </details>
     </section>
 
-    <section>
-      <h2>4. 稀有魚種（鯨魚、獨角鯨、錦鯉）</h2>
+    <section id="secRare">
+      <details class="sec">
+      <summary><h2>4. 稀有魚種與忠誠點</h2><span class="changed"></span><em>訂閱、小奇點、忠誠點品項解鎖鯨魚等稀有魚種</em></summary>
       <em style="margin-bottom:10px">一般觀眾打 !鯨魚 會被擋下來，要用下面的方式解鎖。解鎖會直接變身並出現全場橫幅。被揪團進來的實況主直接送一隻鯨魚。</em>
       <label class="check"><input type="checkbox" id="subs" checked><div><span>訂閱、續訂、被送訂閱就解鎖</span></div></label>
       <label><span>一次贊助幾個小奇點以上解鎖</span><input type="number" id="bits" min="0" value="100"><em>填 0 關掉。訊息裡寫魚種名稱（例如 Cheer100 鯨魚）就解鎖那一隻</em></label>
@@ -173,11 +222,46 @@
       <em>不用登入的限制：品項要勾「<b>需要觀眾輸入文字</b>」，水族箱才看得到兌換。<br>設好頻道後，自己或請觀眾<b>兌換一次</b>，品項就會出現在下面，選它要做什麼。</em>
       <div class="msg"><span class="dot" id="listenDot"></span><span id="listenText">填頻道名稱後開始偵測</span></div>
       <div class="rewards" id="rewards"></div>
+
+      </details>
     </section>
 
-    <section>
-      <details class="adv" id="advanced">
-      <summary>進階（選用）：換電腦也記得每隻魚</summary>
+    <section id="secEvent">
+      <details class="sec">
+      <summary><h2>5. 大事件</h2><span class="changed"></span><em>鯊魚、漩渦、寶箱：多久來一次、要哪幾種、長什麼樣子</em></summary>
+      <label><span>每幾分鐘隨機來一次大事件</span><input type="number" id="event" min="0" max="240" value="15"><em>鯊魚出沒、大漩渦、寶箱掉落輪流來；填 0 關掉。實況主或管理員也可以打 !tank shark／whirl／treasure 手動叫</em></label>
+      <div class="gen" data-group="event"></div>
+
+      </details>
+    </section>
+
+    <section id="secText">
+      <details class="sec">
+      <summary><h2>6. 文字與顏色</h2><span class="changed"></span><em>字型、名字與對話泡泡的樣式、橫幅與提示的顏色和文字</em></summary>
+      <div class="lbl">樣式</div>
+      <div class="gen" data-group="style"></div>
+      <div class="lbl" style="margin-top:12px">畫面上的文字</div>
+      <em>{名字}、{原因}、{魚種} 會換成實際的內容；多行的欄位，每一行是一句，會隨機挑一句。提示裡的 {跳} 會換成目前的指令。</em>
+      <div class="gen" data-group="text"></div>
+
+      </details>
+    </section>
+
+    <section id="secTune">
+      <details class="sec">
+      <summary><h2>7. 指令與手感</h2><span class="changed"></span><em>指令改名、關掉不想要的指令、冷卻時間、魚的速度和長大幅度</em></summary>
+      <div class="lbl">指令</div>
+      <em>取消勾選就關掉這個指令。叫法可以改成自己喜歡的字，用逗號分開好幾個，第一個會顯示在說明卡與提示上。</em>
+      <div class="cmds" id="cmds"></div>
+      <div class="lbl" style="margin-top:12px">手感</div>
+      <div class="gen" data-group="tune"></div>
+
+      </details>
+    </section>
+
+    <section id="advanced">
+      <details class="sec">
+      <summary><h2>進階（選用）：換電腦也記得每隻魚</h2><span class="changed"></span><em>大部分人不需要：要換電腦或重灌 OBS 時才用</em></summary>
       <em style="margin:10px 0">大部分人不需要這個：觀眾的魚（魚種、顏色、配件、長大的大小）平常就記在 OBS 裡，同一台電腦開台都還在。只有<b>要換電腦或重灌 OBS</b> 時才需要接 Google 試算表；設定要進 Google Apps Script，比較麻煩。</em>
       <ol>
         <li>開一份新的 Google 試算表，上方選「擴充功能」裡的「Apps Script」</li>
@@ -188,19 +272,22 @@
       <div class="url"><input type="text" id="store" placeholder="https://script.google.com/macros/s/…/exec"><button class="ghost" id="testStore">測試連線</button></div>
       <div class="msg" id="storeMsg"></div>
       <em style="margin-top:8px">程式碼裡有一組只屬於你的暗號，OBS 網址也會帶著它。<a href="#" id="newKey" style="color:var(--muted)">換一組暗號</a>（換了要重新複製程式碼、重新部署）</em>
+
       </details>
     </section>
   </div>
 
   <div class="right">
     <section>
-      <h2>5. 複製到 OBS</h2>
+      <h2>複製到 OBS</h2>
       <div class="url"><input type="text" id="url" readonly><button id="copy">複製</button></div>
       <div class="msg" id="urlMsg"></div>
-      <p style="color:var(--muted);margin:8px 0 0;font-size:13px">到 OBS 的「來源」按加號，選「瀏覽器」，貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。改了上面任何設定都要重新複製。</p>
+      <p style="color:var(--muted);margin:8px 0 0;font-size:13px">到 OBS 的「來源」按加號，選「瀏覽器」，貼上網址，寬 1920、高 1080。透明模式不用另外設定背景。</p>
+      <label class="check live"><input type="checkbox" id="live" checked><div><span>開台中改設定，直播畫面馬上跟著變</span><em>第一次要先複製網址貼到 OBS。之後只要開著這個網頁，改什麼直播畫面就會自動更新，不用再複製網址。</em></div></label>
+      <div class="msg"><span class="dot" id="liveDot"></span><span id="liveText">連線中…</span></div>
     </section>
     <section>
-      <h2>預覽（按左上角「測試聊天室」的「展開」，可以模擬打指令、訂閱、大事件）</h2>
+      <h2>預覽（左上角「測試聊天室」按「展開」，可以模擬打指令、訂閱、大事件）</h2>
       <iframe id="preview" class="preview" title="水族箱預覽"></iframe>
     </section>
     <section id="objEditor">
@@ -224,7 +311,8 @@
     </section>
     <section>
       <h2>觀眾指令</h2>
-      <table>
+      <em>照你目前的設定列出；在「7. 指令與手感」改名或關掉的指令，這裡會跟著變。</em>
+      <table id="cmdTable">
         <tr><td>!魚</td><td>變成一隻魚加入（同一個人每次進來外觀都一樣）</td></tr>
         <tr><td>!鯊魚 !河豚 !水母 !金魚 !小丑魚 !神仙魚</td><td>換魚種（也可以打 !變 鯊魚）</td></tr>
         <tr><td>!鯨魚 !獨角鯨 !錦鯉</td><td>稀有魚種，解鎖過才能換（身上會發光，鯨魚會噴水）</td></tr>
@@ -247,6 +335,7 @@
     </section>
   </div>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="fish-core.js"></script>
 <script src="chat.js"></script>
 <script src="objects.js"></script>
@@ -255,7 +344,7 @@
   const $ = (id) => document.getElementById(id);
   const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store', 'pfp', 'submit', 'customColor', 'weed', 'bgimg'];
   const SAVE = 'fishtank.setup.v1';
-  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [], theme: 'ocean', hide: [], colors: null, objs: null, oimgs: [] };
+  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [], theme: 'ocean', hide: [], colors: null, objs: null, oimgs: [], ui: {}, words: {}, off: [], room: '', key: '', live: true };
 
   // ───────── 色碼表元件：色塊（點開色票）＋色碼欄位 ─────────
   const hslHex = (h, s, l) => {
@@ -354,6 +443,159 @@
     colorInputs[k] = colorField(box.lastChild, { value: state.colors[k], onChange: (v) => { state.colors[k] = v; refresh(); } });
   }
   for (const c of $('layers').querySelectorAll('input')) c.checked = !state.hide.includes(c.value);
+  if (!state.room) { state.room = newKey().slice(0, 10); state.key = newKey() + newKey(); } // 即時同步的配對碼與暗號
+  $('live').checked = state.live !== false;
+
+  // ───────── 外觀、文字、手感、大事件的表單：照 FishCore.SETTINGS 產生 ─────────
+  const uiValue = (x) => (x.k in state.ui ? state.ui[x.k] : x.type === 'multi' ? x.def.split(',') : x.def);
+  const uiFields = {};
+  function renderField(x) {
+    const box = document.createElement('div');
+    const wide = x.type === 'text' || x.type === 'lines' || x.type === 'multi';
+    if (wide) box.className = 'wide';
+    const set = (v) => { state.ui[x.k] = v; refresh(); };
+    if (x.type === 'color') {
+      box.innerHTML = `<label><span></span></label><div></div>`;
+      box.querySelector('span').textContent = x.label;
+      uiFields[x.k] = colorField(box.lastChild, { value: uiValue(x), onChange: set, empty: x.empty });
+    } else if (x.type === 'range') {
+      box.innerHTML = `<label><span><t></t> <b></b></span><input type="range" min="${x.min}" max="${x.max}" step="${x.step}"></label>`;
+      box.querySelector('t').textContent = x.label;
+      const r = box.querySelector('input'), b = box.querySelector('b');
+      const show = () => { b.textContent = r.value; };
+      r.value = uiValue(x);
+      show();
+      r.addEventListener('input', () => { show(); set(+r.value); });
+      uiFields[x.k] = { set: (v) => { r.value = v; show(); } };
+    } else if (x.type === 'number') {
+      box.innerHTML = `<label><span></span><input type="number" min="${x.min}" max="${x.max}"></label>`;
+      box.querySelector('span').textContent = x.label;
+      const n = box.querySelector('input');
+      n.value = uiValue(x);
+      n.addEventListener('input', () => { if (n.value !== '') set(+n.value); });
+      uiFields[x.k] = { set: (v) => { n.value = v; } };
+    } else if (x.type === 'select') {
+      box.innerHTML = `<label><span></span><select>${Object.entries(x.options).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>`;
+      box.querySelector('span').textContent = x.label;
+      const sel = box.querySelector('select');
+      sel.value = uiValue(x);
+      sel.addEventListener('input', () => set(sel.value));
+      uiFields[x.k] = { set: (v) => { sel.value = v; } };
+    } else if (x.type === 'check') {
+      box.className = 'wide';
+      box.innerHTML = `<label class="check"><input type="checkbox"><div><span></span></div></label>`;
+      box.querySelector('span').textContent = x.label;
+      const c = box.querySelector('input');
+      c.checked = uiValue(x);
+      c.addEventListener('input', () => set(c.checked));
+      uiFields[x.k] = { set: (v) => { c.checked = v; } };
+    } else if (x.type === 'multi') {
+      box.innerHTML = `<span class="cf-lbl"></span><div class="multi">${Object.entries(x.options).map(([k, v]) => `<label><input type="checkbox" value="${k}"> ${v}</label>`).join('')}</div>`;
+      box.querySelector('.cf-lbl').textContent = x.label;
+      const boxes = [...box.querySelectorAll('input')];
+      const show = (v) => boxes.forEach((c) => { c.checked = v.includes(c.value); });
+      show(uiValue(x));
+      for (const c of boxes) c.addEventListener('input', () => set(boxes.filter((b) => b.checked).map((b) => b.value)));
+      uiFields[x.k] = { set: show };
+    } else { // text、lines
+      box.innerHTML = x.type === 'lines' ? `<label><span></span><textarea></textarea></label>` : `<label><span></span><input type="text"></label>`;
+      box.querySelector('span').textContent = x.label;
+      const t = box.querySelector('input, textarea');
+      const toBox = (v) => (x.type === 'lines' ? String(v).split('|').join('\n') : v);
+      t.value = toBox(uiValue(x));
+      t.placeholder = toBox(x.def);
+      t.addEventListener('input', () => set(x.type === 'lines' ? t.value.split('\n').map((l) => l.replace(/\|/g, '／').trim()).filter(Boolean).join('|') || x.def : t.value || x.def));
+      uiFields[x.k] = { set: (v) => { t.value = toBox(v); } };
+    }
+    return box;
+  }
+  for (const host of document.querySelectorAll('.gen')) {
+    for (const x of C.SETTINGS.filter((y) => y.g === host.dataset.group)) host.append(renderField(x));
+  }
+
+  // 指令：開關＋叫法
+  const cmdInputs = {};
+  for (const [cmd, info] of Object.entries(C.CMD_INFO)) {
+    const row = document.createElement('div');
+    row.className = 'cmd';
+    row.innerHTML = `<input type="checkbox"><span></span><input type="text">`;
+    row.querySelector('span').textContent = info.name;
+    const [on, , words] = row.querySelectorAll('input, span');
+    const t = row.querySelector('input[type=text]');
+    t.placeholder = '至少要一個，例如 ' + info.words[0];
+    const show = () => {
+      on.checked = !state.off.includes(cmd);
+      t.value = (state.words[cmd] || info.words).join('、');
+      row.classList.toggle('off', !on.checked);
+    };
+    show();
+    on.addEventListener('input', () => { state.off = on.checked ? state.off.filter((c) => c !== cmd) : [...state.off, cmd]; show(); refresh(); });
+    t.addEventListener('input', () => {
+      const w = C.splitWords(t.value);
+      if (w.length && w.join() !== info.words.join()) state.words[cmd] = w; else delete state.words[cmd];
+      refresh();
+    });
+    cmdInputs[cmd] = show;
+    $('cmds').append(row);
+    void words;
+  }
+
+  // 右邊的觀眾指令表：「!跳」這種預設叫法換成目前的叫法；整列都是被關掉的指令就藏起來
+  const cmdRowsOrig = [...$('cmdTable').rows].map((r) => [r, r.cells[0].textContent]);
+  const DEFAULT_CMD = {};
+  for (const [cmd, info] of Object.entries(C.CMD_INFO)) DEFAULT_CMD[info.words[0]] = cmd;
+  function renderCmdTable() {
+    for (const [r, text] of cmdRowsOrig) {
+      let allOff = true, any = false;
+      r.cells[0].textContent = text.replace(/!([^\s/／@]+)/g, (all, w) => {
+        const cmd = DEFAULT_CMD[w];
+        if (!cmd) { allOff = false; return all; }
+        any = true;
+        if (state.off.includes(cmd)) return ''; // 關掉的指令不列
+        allOff = false;
+        return '!' + (state.words[cmd] || C.CMD_INFO[cmd].words)[0];
+      }).replace(/\s{2,}/g, ' ').replace(/^[\s/]+|[\s/]+$/g, '').replace(/\/\s*\//g, '/');
+      r.hidden = any && allOff;
+    }
+  }
+
+  // 每一區：顯示改了幾項，以及「還原預設」
+  const SECTION_RESET = {
+    secLook: () => { state.theme = 'ocean'; state.colors = themeColors('ocean'); $('customColor').checked = false; state.hide = []; $('weed').value = 1; $('bgimg').value = ''; resetUi('look'); },
+    secEvent: () => { $('event').value = 15; resetUi('event'); },
+    secText: () => { resetUi('style'); resetUi('text'); },
+    secTune: () => { state.off = []; state.words = {}; Object.values(cmdInputs).forEach((f) => f()); resetUi('tune'); },
+  };
+  function resetUi(group) {
+    for (const x of C.SETTINGS.filter((y) => y.g === group)) { delete state.ui[x.k]; uiFields[x.k].set(uiValue(x)); }
+  }
+  for (const [id, fn] of Object.entries(SECTION_RESET)) {
+    const d = document.createElement('div');
+    d.className = 'reset';
+    d.innerHTML = '<button type="button" class="ghost">這一區還原預設</button>';
+    d.querySelector('button').addEventListener('click', () => {
+      if (!confirm('把這一區的設定全部還原成預設？')) return;
+      fn();
+      for (const [k] of COLOR_KEYS) colorInputs[k].set(state.colors[k]);
+      for (const c of $('layers').querySelectorAll('input')) c.checked = !state.hide.includes(c.value);
+      refresh();
+    });
+    $(id).querySelector('details').append(d);
+  }
+  function changedCount(group) {
+    return C.SETTINGS.filter((x) => x.g === group && C.writeSetting(x, uiValue(x)) !== null).length;
+  }
+  function showChanged() {
+    const n = {
+      secLook: changedCount('look') + (state.theme !== 'ocean') + $('customColor').checked + (state.hide.length > 0) + (+$('weed').value !== 1) + !!$('bgimg').value.trim(),
+      secEvent: changedCount('event') + (+$('event').value !== 15),
+      secText: changedCount('style') + changedCount('text'),
+      secTune: changedCount('tune') + state.off.length + Object.keys(state.words).length,
+      secSkins: state.skins.length + !$('pfp').checked + !$('submit').checked,
+      secRare: !$('subs').checked + (+$('bits').value !== 100) + Object.keys(state.rewards).length,
+    };
+    for (const [id, k] of Object.entries(n)) $(id).querySelector('.changed').textContent = k ? `已改 ${k} 項` : '';
+  }
 
   function newKey() {
     const a = new Uint8Array(12);
@@ -394,8 +636,14 @@
     if (+$('weed').value !== 1) p.set('weed', $('weed').value);
     if (/^https:\/\//.test($('bgimg').value.trim())) p.set('bgimg', $('bgimg').value.trim());
     for (const k of state.skins) p.append('skin', `${k.name}|${k.url}`);
+    for (const x of C.SETTINGS) { const w = C.writeSetting(x, uiValue(x)); if (w !== null) p.set(x.k, w); }
+    for (const [cmd, w] of Object.entries(state.words)) p.set('c_' + cmd, w.join(','));
+    if (state.off.length) p.set('off', state.off.join(','));
     if ($('store').value.trim()) { p.set('store', $('store').value.trim()); p.set('skey', state.skey); }
-    if (demo) { p.set('demo', '1'); p.delete('store'); p.delete('skey'); } // 預覽不寫進試算表
+    if (demo) { p.set('demo', '1'); p.delete('store'); p.delete('skey'); return p.toString(); } // 預覽不寫進試算表、不即時同步
+    p.set('room', state.room);
+    p.set('key', state.key);
+    p.set('t', Date.now()); // 複製的時間：OBS 重開時，比較網址和最後一次即時同步哪個新
     return p.toString();
   }
 
@@ -415,19 +663,86 @@
     for (const b of $('themes').children) b.classList.toggle('on', b.dataset.theme === state.theme);
     const len = $('url').value.length;
     $('urlMsg').className = 'msg' + (len > 30000 ? ' bad' : '');
-    $('urlMsg').textContent = len > 30000 ? `網址太長（${len} 字），OBS 可能貼不進去：請移除一兩張自訂魚種圖片` : '';
+    $('urlMsg').textContent = len > 30000 ? `網址太長（${len} 字），OBS 可能貼不進去：請移除一兩張自訂魚種或物件圖片` : '';
+    showChanged();
+    renderCmdTable();
     listen();
+    liveQueue();
     if (fromPreview === true) return;
     clearTimeout(timer);
     timer = setTimeout(() => {
-      // 只有物件變了：直接告訴預覽，不重新載入（魚不會不見）；其他設定變了才重新載入
-      const key = new URLSearchParams(params(true));
+      // 預覽已經開著：直接把新設定給它（魚不會不見）；只有物件變了就只換物件（保留選取）
+      const q = params(true);
+      const key = new URLSearchParams(q);
       key.delete('objs');
       const frame = $('preview').contentWindow;
-      if (key.toString() === lastPreview && frame && frame.FishTank) frame.FishTank.setObjects(state.objs, sel);
-      else { lastPreview = key.toString(); $('preview').src = 'tank.html?' + params(true) + '&edit=1'; }
+      if (frame && frame.FishTank && lastPreview) {
+        if (key.toString() === lastPreview) frame.FishTank.setObjects(state.objs, sel);
+        else frame.FishTank.applyOptions('?' + q + '&edit=1');
+      } else $('preview').src = 'tank.html?' + q + '&edit=1';
+      lastPreview = key.toString();
     }, 250);
   }
+
+  // ───────── 即時同步：改設定時把新設定送給 OBS 裡的水族箱 ─────────
+  const live = { clients: [], bc: null, seen: new Set(), timer: 0, acked: 0, obs: 0 };
+  function liveStatus(text, on) {
+    $('liveDot').className = 'dot' + (on ? ' on' : '');
+    $('liveText').textContent = text;
+  }
+  function liveQuery() { // 不送暗號、試算表（公開中繼伺服器上別人可能看得到）
+    const p = new URLSearchParams(params(false));
+    for (const k of C.PRIVATE_PARAMS) p.delete(k);
+    p.delete('t');
+    return p.toString();
+  }
+  async function liveSend(msg) {
+    const signed = await C.signMessage(state.key, { ...msg, mid: Math.random().toString(36).slice(2) });
+    live.seen.add(signed.mid);
+    if (live.bc) live.bc.postMessage(signed);
+    for (const c of live.clients) if (c.connected) c.publish('fishtank/' + state.room, JSON.stringify(signed));
+  }
+  function liveQueue() {
+    clearTimeout(live.timer);
+    if (!$('live').checked) return;
+    live.timer = setTimeout(() => liveSend({ type: 'cfg', q: liveQuery() }), 400);
+  }
+  async function liveRecv(msg) {
+    if (!msg || live.seen.has(msg.mid)) return;
+    live.seen.add(msg.mid);
+    if (!(await C.verifyMessage(state.key, msg))) return;
+    if (msg.type === 'hello' && $('live').checked) liveSend({ type: 'cfg', q: liveQuery() }); // OBS 剛打開：送目前的設定
+    if (msg.type === 'ack' || msg.type === 'hello') {
+      live.acked = Date.now();
+      const t = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+      liveStatus(msg.type === 'ack' ? `直播畫面已更新（${t}）` : `OBS 的水族箱已連上（${t}）`, true);
+    }
+  }
+  function liveStart() {
+    live.clients.forEach((c) => c.end(true));
+    live.clients = [];
+    if (live.bc) live.bc.close();
+    try { live.bc = new BroadcastChannel('fishtank:' + state.room); live.bc.onmessage = (e) => liveRecv(e.data); } catch { live.bc = null; }
+    if (!window.mqtt) { liveStatus('連不上即時同步的伺服器（網路被擋？）。改設定後請重新複製網址到 OBS。', false); return; }
+    liveStatus('連線中…', false);
+    for (const [i, url] of ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'].entries()) {
+      try {
+        const c = mqtt.connect(url, { clientId: `fs_${Math.random().toString(36).slice(2, 10)}_${i}`, reconnectPeriod: 3000, connectTimeout: 8000, clean: true });
+        c.on('connect', () => {
+          c.subscribe('fishtank/' + state.room);
+          if (!live.acked) liveStatus('已就緒：等 OBS 打開水族箱（還沒貼過網址的話，先按上面的「複製」）', true);
+        });
+        c.on('message', (t, buf) => { try { liveRecv(JSON.parse(buf.toString())); } catch { /* 格式不對 */ } });
+        c.on('offline', () => { if (!live.clients.some((x) => x.connected)) liveStatus('即時同步斷線，重新連線中…', false); });
+        live.clients.push(c);
+      } catch { /* 這台連不上就算了 */ }
+    }
+  }
+  $('live').addEventListener('input', () => {
+    state.live = $('live').checked;
+    if (!state.live) liveStatus('已關閉：改設定後要重新複製網址到 OBS', false);
+    else { liveStart(); liveQueue(); }
+  });
   for (const k of fields) $(k).addEventListener('input', () => refresh());
 
   // ───────── 魚缸物件編輯：預覽裡拖曳，這裡加、刪、改大小顏色 ─────────
@@ -651,6 +966,21 @@
     $('copy').textContent = '已複製';
     setTimeout(() => ($('copy').textContent = '複製'), 1500);
   });
+  // 三步驟按鈕：打開那一區、捲過去、閃一下
+  for (const b of document.querySelectorAll('[data-go]')) {
+    b.addEventListener('click', () => {
+      const el = $(b.dataset.go);
+      const d = el.closest('details');
+      if (d) d.open = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.remove('flash');
+      void el.offsetWidth;
+      el.classList.add('flash');
+      if (el.tagName === 'INPUT') el.focus({ preventScroll: true });
+    });
+  }
+  if ($('live').checked) liveStart();
+  else liveStatus('已關閉：改設定後要重新複製網址到 OBS', false);
   refresh();
 </script>
 </body>

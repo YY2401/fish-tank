@@ -14,7 +14,7 @@
       "duration": 4
     },
     {
-      "caption": "在「Twitch 頻道名稱」填你的頻道名稱（twitch.tv/ 後面那段），不用登入",
+      "caption": "照最上面的三步驟做：先在「Twitch 頻道名稱」填你的頻道名稱，不用登入",
       "highlight": "#channel",
       "before": [
         {
@@ -39,12 +39,15 @@
       "duration": 5.5
     },
     {
-      "caption": "「2. 魚缸外觀」點一個配色就換背景；勾「自己選顏色」可以用色碼表調九種顏色",
+      "caption": "按三步驟的第 2 步，打開「外觀與配色」，點一個配色就換背景",
       "highlight": "#themes",
       "duration": 5.5,
       "before": [
         {
-          "scroll": "#layers"
+          "click": "[data-go=\"themes\"]"
+        },
+        {
+          "wait": 800
         },
         {
           "click": "[data-theme=\"tropical\"]"
@@ -76,6 +79,12 @@
       "duration": 5.5,
       "before": [
         {
+          "click": "#secSkins summary"
+        },
+        {
+          "wait": 500
+        },
+        {
           "scroll": "#avatarLbl"
         }
       ]
@@ -86,13 +95,40 @@
       "duration": 5,
       "before": [
         {
+          "click": "#secRare summary"
+        },
+        {
+          "wait": 500
+        },
+        {
           "scroll": "#listenText"
         }
       ]
     },
     {
-      "caption": "設定好了，到右上「5. 複製到 OBS」按「複製」",
+      "caption": "文字、顏色、指令名稱、鯊魚的樣子…都收在 5～7 區，點標題打開，每區都能一鍵還原預設",
+      "highlight": "#secText",
+      "duration": 5.5,
+      "before": [
+        {
+          "click": "#secText summary"
+        },
+        {
+          "wait": 500
+        },
+        {
+          "scroll": "#secText"
+        }
+      ]
+    },
+    {
+      "caption": "設定好了，到右上「複製到 OBS」按「複製」",
       "highlight": "#copy"
+    },
+    {
+      "caption": "下面這個打勾的話，之後開著設定頁改什麼，直播畫面都會自動跟著變，不用再複製",
+      "highlight": "label.live",
+      "duration": 5.5
     },
     {
       "goto": "docs/video/slide.html?img=1-sources.jpg&box=212,900,26,22",

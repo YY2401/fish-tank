@@ -413,10 +413,10 @@ if (!H.chromePath()) {
   });
 
   test('魚缸物件：網址裡的物件都畫得出來，舊網址的 deco 也還能用', async (t) => {
-    const all = C.OBJECT_IDS.map((t, i) => `${t}~${(i + 0.5) / 12}~~1~${i % 2}~`).join('|') + '|anchor~0.5~0.4~2~0~ff0000';
+    const all = C.OBJECT_IDS.map((t, i) => `${t}~${(i + 0.5) / C.OBJECT_IDS.length}~~1~${i % 2}~`).join('|') + '|anchor~0.5~0.4~2~0~ff0000';
     let page = await open(t, '&objs=' + encodeURIComponent(all));
     await advance(page, 0.2);
-    assert.equal(await page.evaluate(() => FishTank.objects.length), 13);
+    assert.equal(await page.evaluate(() => FishTank.objects.length), C.OBJECT_IDS.length + 1);
     assert.deepEqual(page.errors, []);
     page = await open(t, '&deco=castle,ship');
     assert.deepEqual(await page.evaluate(() => FishTank.objects.map((o) => o.t)), ['castle']);
@@ -446,5 +446,93 @@ if (!H.chromePath()) {
     assert.deepEqual(await look(), { color2: '#3fa4ff', wearColor: '#ff8ccf', sizePick: 'large', tag: 'hide', face: 'dizzy' });
     await chat(page, 'amy', '!副色 關');
     assert.equal(await page.evaluate(() => FishTank.fishes.get('amy').color2), null);
+  });
+
+  test('指令改名與關閉：改過的叫法能用、舊的變成一般聊天，說明卡與提示跟著變', async (t) => {
+    const page = await open(t, '&c_jump=' + encodeURIComponent('蹦,hop') + '&off=feed&tip=1');
+    await chat(page, 'amy', '!魚');
+    await advance(page, 3);
+    await chat(page, 'amy', '!蹦');
+    assert.equal((await fish(page, 'amy')).state, 'jump');
+    await advance(page, 6);
+    await chat(page, 'amy', '!餵');
+    assert.equal((await peek(page)).food, 0, '關掉的指令不能用');
+    assert.equal((await fish(page, 'amy')).say, '!餵', '當成一般聊天');
+    const help = await page.$eval('#help dl', (e) => e.textContent);
+    assert.match(help, /!蹦/);
+    assert.doesNotMatch(help, /!跳 /);
+    assert.doesNotMatch(help, /!餵/);
+    const tips = await page.evaluate(() => FishTank.tips().join('\n'));
+    assert.match(tips, /!蹦/);
+    assert.doesNotMatch(tips, /!餵/, '有關掉的指令的提示整句不顯示');
+  });
+
+  test('文字與樣式：橫幅、說明卡標題、魚說的話、顏色都用設定的', async (t) => {
+    const q = '&x_shark=' + encodeURIComponent('大白鯊來了') + '&x_by=' + encodeURIComponent('〔{名字}〕') + '&x_help=' + encodeURIComponent('玩法') +
+      '&x_join=' + encodeURIComponent('嗨嗨') + '&gtext=%23ff0000&tkey=%2300ff00&font=serif&nsize=20';
+    const page = await open(t, q);
+    await chat(page, 'amy', '!魚');
+    await chat(page, 'amy', '!魚');
+    assert.equal((await fish(page, 'amy')).say, '嗨嗨');
+    await page.evaluate(() => FishTank.startEvent('shark', { display: 'Boss' }));
+    assert.equal((await peek(page)).banner, '大白鯊來了〔Boss〕');
+    assert.equal(await page.$eval('#help h2', (e) => e.textContent), '玩法');
+    assert.equal(await page.$eval('#banner', (e) => getComputedStyle(e).color), 'rgb(255, 0, 0)');
+    assert.equal(await page.$eval('#help dt', (e) => getComputedStyle(e).color), 'rgb(0, 255, 0)');
+    assert.match(await page.evaluate(() => document.documentElement.style.getPropertyValue('--font')), /Noto Serif TC/);
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('link')].some((l) => /Noto\+Serif\+TC/.test(l.href))), '換字型要載入那個字型');
+  });
+
+  test('大事件設定：只開漩渦、漩渦長度、鯊魚咬幾隻、寶箱多久消失', async (t) => {
+    const page = await open(t);
+    await page.evaluate(() => FishTank.applyOptions('?demo=1&tip=0&ev=whirl&whirl=4&chomp=0&tsec=10&event=0.05'));
+    await many(page, 6);
+    await advance(page, 6); // event=0.05 分鐘：幾秒內就會隨機來一次
+    for (let i = 0; i < 10 && !(await peek(page)).ev; i++) await advance(page, 1);
+    assert.equal((await peek(page)).ev, 'whirl', '只會出現漩渦');
+    assert.equal((await peek(page)).evDur, 4, '漩渦轉 4 秒');
+    await page.evaluate(() => FishTank.applyOptions('?demo=1&tip=0&chomp=0&tsec=10&event=0')); // 關掉隨機大事件，再測鯊魚和寶箱
+    await advance(page, 5);
+    assert.equal((await peek(page)).ev, null, '漩渦結束後沒有再來');
+    await page.evaluate(() => FishTank.startEvent('shark'));
+    await advance(page, 12);
+    assert.equal(await page.evaluate(() => [...FishTank.fishes.values()].filter((f) => f.chomped).length), 0, 'chomp=0 不咬人');
+    await advance(page, 10);
+    await page.evaluate(() => { FishTank.fishes.clear(); FishTank.startEvent('treasure'); });
+    await advance(page, 11);
+    assert.equal((await peek(page)).ev, null, '10 秒沒人搶就消失');
+  });
+
+  test('手感：速度、長大幅度、最大體型、冷卻倍率', async (t) => {
+    const page = await open(t, '&grow=0.2&maxsize=1.3&cd=0');
+    await chat(page, 'amy', '!魚');
+    await advance(page, 2);
+    await chat(page, 'amy', '!餵');
+    await advance(page, 30);
+    assert.equal((await fish(page, 'amy')).size, 1.3, '長到最大 1.3 倍就停');
+    await chat(page, 'amy', '!餵');
+    assert.ok((await peek(page)).food > 0, 'cd=0 不用等冷卻');
+  });
+
+  test('擺放的海草會動，而且可以拖拉（是物件）', async (t) => {
+    const page = await open(t, '&weed=0&objs=' + encodeURIComponent('seaweed~0.3~~1.5~0~ff00ff'));
+    await advance(page, 0.2);
+    assert.equal((await peek(page)).seaweed, 0, '隨機海草關掉');
+    assert.deepEqual(await page.evaluate(() => FishTank.objects.map((o) => o.t)), ['seaweed']);
+    const box = await page.evaluate(() => FishTank.objectBox(0));
+    const px = (x, y) => page.evaluate((x, y) => { const c = document.getElementById('tank'); const k = c.width / innerWidth; return [...c.getContext('2d').getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data].slice(0, 3); }, x, y);
+    const base = await px(box.x + box.w / 2, box.y + box.h - 6);
+    assert.ok(base[0] > 200 && base[2] > 200 && base[1] < 80, `海草用設定的顏色畫，實際 ${base}`);
+  });
+
+  test('即時套用新設定：魚留著，配色、物件、文字都換掉', async (t) => {
+    const page = await open(t);
+    await many(page, 5);
+    await page.evaluate(() => FishTank.applyOptions('?theme=night&objs=' + encodeURIComponent('ship~0.5~~1~0~') + '&x_help=' + encodeURIComponent('新標題') + '&demo=1'));
+    assert.equal(await page.evaluate(() => FishTank.fishes.size), 5, '魚還在');
+    assert.equal(await page.evaluate(() => FishTank.opt.themeId), 'night');
+    assert.deepEqual(await page.evaluate(() => FishTank.objects.map((o) => o.t)), ['ship']);
+    assert.equal(await page.$eval('#help h2', (e) => e.textContent), '新標題');
+    assert.deepEqual(page.errors, []);
   });
 }

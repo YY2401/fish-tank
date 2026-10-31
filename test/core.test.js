@@ -125,3 +125,37 @@ test('自訂魚種圖片：https 或縮小後的圖片資料，其他（javascri
   const k = C.parseSkins(['a|https://x.y/a.png', 'b|data:image/webp;base64,UklGRg==', 'c|data:text/html;base64,PGI+', 'd|javascript:alert(1)']);
   assert.deepStrictEqual(k.map((x) => x.name), ['a', 'b']);
 });
+
+test('指令可以改叫法、可以關掉；魚種名稱變身不受影響', () => {
+  const o = C.readOptions('?c_jump=' + encodeURIComponent('蹦、hop') + '&off=feed,sleep');
+  assert.strictEqual(C.parseCommand('!蹦', [], o.aliases).cmd, 'jump');
+  assert.strictEqual(C.parseCommand('!hop', [], o.aliases).cmd, 'jump');
+  assert.strictEqual(C.parseCommand('!跳', [], o.aliases), null, '改名後舊的叫法不能用');
+  assert.strictEqual(C.parseCommand('!餵', [], o.aliases), null, '關掉的指令');
+  assert.strictEqual(C.parseCommand('!鯊魚', [], o.aliases).cmd, 'skin');
+  assert.strictEqual(C.parseCommand('!tank feed', [], o.aliases).cmd, 'tank', '!tank 不能改也不能關');
+  assert.deepStrictEqual(C.splitWords('!蹦, hop、 跳跳'), ['蹦', 'hop', '跳跳']);
+});
+
+test('外觀、文字、手感、大事件設定：讀網址、超出範圍會夾住、跟預設一樣就不寫進網址', () => {
+  const o = C.readOptions('?nsize=99&ncolor=%23ff0000&font=nope&ev=whirl,bad&glass=0&x_shark=' + encodeURIComponent('來了！') + '&scc=');
+  assert.strictEqual(o.ui.nsize, 32);
+  assert.strictEqual(o.ui.ncolor, '#ff0000');
+  assert.strictEqual(o.ui.font, 'sans');
+  assert.deepStrictEqual(o.ui.ev, ['whirl']);
+  assert.strictEqual(o.ui.glass, false);
+  assert.strictEqual(o.ui.x_shark, '來了！');
+  assert.strictEqual(o.ui.scc, '');
+  const d = C.readOptions('');
+  for (const x of C.SETTINGS) assert.strictEqual(C.writeSetting(x, d.ui[x.k]), null, `${x.k} 預設值不應該寫進網址`);
+  assert.strictEqual(C.fillText('{名字} {原因}', { 名字: 'A' }), 'A {原因}');
+});
+
+test('即時同步的簽章：對的暗號才收，內容被改或太舊都拒絕', async () => {
+  const m = await C.signMessage('k1', { type: 'cfg', q: 'theme=night' });
+  assert.ok(await C.verifyMessage('k1', m));
+  assert.ok(!(await C.verifyMessage('k2', m)));
+  assert.ok(!(await C.verifyMessage('k1', { ...m, q: 'theme=deep' })));
+  assert.ok(!(await C.verifyMessage('k1', m, m.ts + 10 * 60 * 1000)));
+  assert.ok(C.PRIVATE_PARAMS.includes('key') && C.PRIVATE_PARAMS.includes('skey'), '暗號不能經過中繼伺服器');
+});
