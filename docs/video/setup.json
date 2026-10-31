@@ -55,17 +55,17 @@
       ]
     },
     {
-      "caption": "預覽下面的「魚缸物件」點一個就加進魚缸，在預覽上直接拖曳位置、滾輪調大小",
-      "highlight": "#objPalette",
+      "caption": "預覽下面的「魚缸物件」點一個就加進魚缸，在預覽上按住物件拖曳位置、滾輪調大小",
+      "highlight": "#preview",
       "before": [
-        {
-          "scroll": "#objPanel"
-        },
         {
           "click": "#objPalette [data-obj=\"ship\"]"
         },
         {
-          "wait": 1500
+          "wait": 1800
+        },
+        {
+          "scroll": "#objPalette"
         }
       ],
       "duration": 6
