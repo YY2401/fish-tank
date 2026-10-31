@@ -51,12 +51,12 @@ test('存了再讀回來，同一個帳號會更新同一列，頭像也記得',
   assert.deepStrictEqual(post({ key: 'k1', action: 'list' }), { ok: true, profiles: {} });
   post({ key: 'k1', action: 'save', profiles: [{ login: 'Fan01', display: '粉絲', species: 'whale', color: 'rainbow', size: 1.2, unlocked: ['whale'] }] });
   post({ key: 'k1', action: 'save', profiles: [
-    { login: 'fan01', display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }, wear: 'crown', pattern: 'spots', mine: 'https://i.example.com/me.png' },
+    { login: 'fan01', display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }, wear: 'crown', pattern: 'spots', mine: 'https://i.example.com/me.png', color2: '#3fa4ff', wearColor: 'rainbow', sizePick: 'large', tag: 'hide', face: 'love' },
     { login: 'b', species: 'clown', size: 1, unlocked: [] },
   ] });
   assert.strictEqual(rows.length, 3); // 標題 + 2 個人
   const j = post({ key: 'k1', action: 'list' });
-  assert.deepStrictEqual(j.profiles.fan01, { display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }, wear: 'crown', pattern: 'spots', mine: 'https://i.example.com/me.png' });
+  assert.deepStrictEqual(j.profiles.fan01, { display: '粉絲', species: 'koi', color: null, size: 1.3, unlocked: ['whale', 'koi'], avatar: { kind: 'emote', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' }, wear: 'crown', pattern: 'spots', mine: 'https://i.example.com/me.png', color2: '#3fa4ff', wearColor: 'rainbow', sizePick: 'large', tag: 'hide', face: 'love' });
   assert.strictEqual(j.profiles.b.species, 'clown');
   assert.strictEqual(j.profiles.b.avatar, null);
 });
@@ -66,5 +66,6 @@ test('舊版試算表（少了後面幾欄）會自動補上標題；不再有�
   post({ key: 'k1', action: 'list' });
   assert.strictEqual(rows[0][7], '頭像');
   assert.strictEqual(rows[0][10], '個人魚圖片');
+  assert.strictEqual(rows[0][15], '表情');
   assert.deepStrictEqual(post({ key: 'k1', action: 'upload', mime: 'image/png', data: 'AAAA' }), { ok: false, error: '不認得的動作' });
 });

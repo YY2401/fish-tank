@@ -45,10 +45,32 @@
   .theme i { display: block; height: 30px; }
   .theme span { display: block; padding: 2px 0 3px; background: #071c2e; }
   .theme.on { border-color: var(--accent); }
-  .colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; margin-bottom: 12px; }
   .colors[hidden] { display: none; }
-  .colors label { margin: 0; }
-  .colors input { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: #071c2e; padding: 2px; }
+  .colors .cf-lbl { font-size: 13px; font-weight: 700; display: block; margin-bottom: 3px; }
+  /* 色碼表：色塊按鈕＋色碼欄位，點色塊打開色票 */
+  .cf { position: relative; display: flex; gap: 4px; align-items: center; }
+  .cf-sw { width: 34px; height: 30px; flex: none; padding: 0; border: 2px solid #fff3; border-radius: 6px; }
+  .cf-hex { width: 100%; min-width: 0; padding: 5px 6px !important; font: 13px ui-monospace, monospace !important; }
+  .cf-pop { position: absolute; z-index: 20; top: 36px; left: 0; width: 248px; padding: 8px; border-radius: 10px; background: #0b2740; border: 1px solid var(--line); box-shadow: 0 8px 24px #0008; }
+  .cf-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+  .cf-grid button { aspect-ratio: 1; padding: 0; border-radius: 3px; border: 1px solid #0003; }
+  .cf-grid button:hover { outline: 2px solid #fff; }
+  .cf-more { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .cf-more input[type=color] { width: 40px; height: 26px; padding: 0; border: 0; background: none; }
+  .cf-more button { padding: 3px 8px; font-size: 12px; }
+  .obj-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; margin: 10px 0; }
+  .obj-palette button, .obj-palette label { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; margin: 0; border-radius: 8px; background: #071c2e; color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer; }
+  .obj-palette canvas { width: 64px; height: 48px; }
+  .obj-palette .up { justify-content: center; min-height: 64px; border: 1px dashed var(--line); }
+  .obj-panel { background: #071c2e; border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+  .obj-row { display: flex; gap: 10px; align-items: center; margin: 0; }
+  .obj-row > span { flex: none; min-width: 3.5em; font-size: 13px; }
+  .obj-row input[type=range] { flex: 1; }
+  .obj-hint { color: var(--muted); font-size: 12px; }
+  .obj-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .obj-btns button { padding: 5px 10px; font-size: 13px; }
+  .obj-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: var(--muted); font-size: 13px; }
   details.adv summary { cursor: pointer; font-weight: 700; font-size: 15px; }
   details.adv[open] summary { margin-bottom: 4px; }
   .skins { display: grid; gap: 6px; margin: 8px 0; }
@@ -111,17 +133,13 @@
       <div class="lbl">配色（背景選「完整水族箱」時才有）</div>
       <div class="themes" id="themes"></div>
       <label class="check"><input type="checkbox" id="customColor"><div><span>自己選顏色</span></div></label>
-      <div class="colors" id="colorRow" hidden>
-        <label><span>水面</span><input type="color" id="waterTop" value="#1d7fb0"></label>
-        <label><span>深處</span><input type="color" id="waterBottom" value="#07304f"></label>
-        <label><span>沙子</span><input type="color" id="sandColor" value="#d8bf86"></label>
-      </div>
+      <div class="colors" id="colorRow" hidden></div>
       <div class="lbl">畫面上要有哪些東西</div>
       <div class="checks" id="layers"></div>
       <label><span>海草</span><select id="weed"><option value="0">沒有</option><option value="1" selected>一般</option><option value="2">多</option><option value="3">很多</option></select></label>
       <label><span>背景圖片（選用）</span><input type="text" id="bgimg" placeholder="圖片網址 https://…，留空就用上面的配色"><em>想用自己的背景圖：把圖放在能公開看的地方（例如 Imgur、Discord），貼上圖片網址</em></label>
-      <div class="lbl" id="decoLbl">裝飾（擺在魚缸底部）</div>
-      <div class="checks" id="decos"></div>
+      <div class="lbl" id="decoLbl">魚缸物件</div>
+      <em>城堡、沉船、珊瑚、海星…在右邊預覽<b>下面的「魚缸物件」</b>加，直接在預覽上拖曳位置、調大小與顏色。</em>
       <label><span>每幾分鐘隨機來一次大事件</span><input type="number" id="event" min="0" max="240" value="15"><em>鯊魚出沒、大漩渦、寶箱掉落輪流來；填 0 關掉。實況主或管理員也可以打 !tank shark／whirl／treasure 手動叫</em></label>
     </section>
 
@@ -185,6 +203,25 @@
       <h2>預覽（按左上角「測試聊天室」展開，可以模擬打指令、訂閱、大事件）</h2>
       <iframe id="preview" class="preview" title="水族箱預覽"></iframe>
     </section>
+    <section id="objEditor">
+      <h2>魚缸物件（在上面的預覽直接拖曳）</h2>
+      <em>點下面的物件加進魚缸；在預覽裡<b>按住物件拖曳</b>移動位置，<b>滑鼠滾輪</b>調大小。選到的物件可以在這裡翻轉、換顏色、刪除。</em>
+      <div class="obj-palette" id="objPalette"></div>
+      <div class="obj-panel" id="objPanel" hidden>
+        <div class="obj-row"><b id="objName"></b><span class="obj-hint">（在預覽上有黃色虛線框）</span></div>
+        <label class="obj-row"><span>大小 <b id="objSizeV"></b></span><input type="range" id="objSize" min="0.2" max="4" step="0.05"></label>
+        <div class="obj-row"><span>顏色</span><div id="objColor"></div></div>
+        <div class="obj-btns">
+          <button type="button" class="ghost" id="objFlip">左右翻轉</button>
+          <button type="button" class="ghost" id="objFloor">放回沙地</button>
+          <button type="button" class="ghost" id="objUp">移到前面</button>
+          <button type="button" class="ghost" id="objDown">移到後面</button>
+          <button type="button" class="ghost" id="objCopy">複製一個</button>
+          <button type="button" class="ghost" id="objDel">刪除</button>
+        </div>
+      </div>
+      <div class="obj-foot"><span id="objCount"></span><button type="button" class="ghost" id="objClear">全部清掉</button></div>
+    </section>
     <section>
       <h2>觀眾指令</h2>
       <table>
@@ -196,6 +233,9 @@
         <tr><td>!餵 / !餵 @名字 / !餵 大家</td><td>撒飼料給自己 / 請別人吃 / 全場一起吃，吃到會變大（最大 2 倍）</td></tr>
         <tr><td>!頭像 表情符號 / !頭像 大頭貼</td><td>把表情符號或 Twitch 大頭貼貼在魚身上（!頭像 關 拿掉）</td></tr>
         <tr><td>!戴 帽子 / !花紋 條紋</td><td>配件：帽子 皇冠 眼鏡 蝴蝶結 海盜帽 花 耳機 光環；花紋：條紋 斑點 星星 愛心（關 拿掉）</td></tr>
+        <tr><td>!副色 紅 / !配件色 粉</td><td>鰭、尾巴、花紋的第二顏色 / 配件的顏色（關 換回原色）</td></tr>
+        <tr><td>!大小 小／中／大 / !名牌 粉</td><td>選魚的大小 / 名牌顏色，!名牌 隱藏 把名字藏起來</td></tr>
+        <tr><td>!表情 開心</td><td>開心 生氣 愛心眼 想睡 驚訝 星星眼 眨眼 暈（關 換回來）</td></tr>
         <tr><td>!我的魚 圖片網址</td><td>提交自己的魚，實況主或管理員核准後才會出現</td></tr>
         <tr><td>!抱 @名字 / !跟 @名字</td><td>游過去抱抱冒愛心 / 跟在對方後面游 30 秒</td></tr>
         <tr><td>!離開</td><td>游出畫面</td></tr>
@@ -209,12 +249,69 @@
 </main>
 <script src="fish-core.js"></script>
 <script src="chat.js"></script>
+<script src="objects.js"></script>
 <script>
   const C = FishCore;
   const $ = (id) => document.getElementById(id);
-  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store', 'pfp', 'submit', 'customColor', 'waterTop', 'waterBottom', 'sandColor', 'weed', 'bgimg'];
+  const fields = ['channel', 'auto', 'say', 'tip', 'bg', 'top', 'bottom', 'left', 'right', 'scale', 'max', 'idle', 'event', 'subs', 'bits', 'store', 'pfp', 'submit', 'customColor', 'weed', 'bgimg'];
   const SAVE = 'fishtank.setup.v1';
-  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [], theme: 'ocean', hide: [] };
+  let state = { rewards: {}, seen: {}, decos: C.DEFAULTS.deco.split(','), skey: '', skins: [], theme: 'ocean', hide: [], colors: null, objs: null, oimgs: [] };
+
+  // ───────── 色碼表元件：色塊（點開色票）＋色碼欄位 ─────────
+  const hslHex = (h, s, l) => {
+    s /= 100; l /= 100;
+    const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+    return '#' + [f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, '0')).join('');
+  };
+  // 12 種色相 × 5 種深淺，最後一排是黑白灰
+  const PALETTE = [...[88, 75, 60, 45, 30].flatMap((l) => Array.from({ length: 12 }, (_, i) => hslHex(i * 30, l > 80 ? 80 : 70, l))),
+    ...Array.from({ length: 12 }, (_, i) => hslHex(0, 0, Math.round(100 - (i * 100) / 11)))];
+  function colorField(host, { value, onChange, empty }) {
+    host.classList.add('cf');
+    host.innerHTML = '<button type="button" class="cf-sw" title="打開色碼表"></button><input type="text" class="cf-hex" maxlength="7" placeholder="#rrggbb"><div class="cf-pop" hidden><div class="cf-grid"></div><div class="cf-more">更多顏色 <input type="color"></div></div>';
+    const sw = host.querySelector('.cf-sw'), hex = host.querySelector('.cf-hex'), pop = host.querySelector('.cf-pop'), native = host.querySelector('input[type=color]');
+    let cur = value || '';
+    const show = (v) => {
+      cur = v;
+      sw.style.background = v || 'repeating-conic-gradient(#556 0 25%, #889 0 50%) 0 0 / 10px 10px';
+      if (document.activeElement !== hex) hex.value = v;
+      native.value = v || '#ffffff';
+    };
+    const pick = (v) => { show(v); onChange(v); };
+    for (const c of PALETTE) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.style.background = c;
+      b.title = c;
+      b.addEventListener('click', () => { pick(c); pop.hidden = true; });
+      host.querySelector('.cf-grid').append(b);
+    }
+    if (empty) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ghost';
+      b.textContent = empty;
+      b.addEventListener('click', () => { pick(''); pop.hidden = true; });
+      host.querySelector('.cf-more').append(b);
+    }
+    sw.addEventListener('click', () => { document.querySelectorAll('.cf-pop').forEach((x) => { if (x !== pop) x.hidden = true; }); pop.hidden = !pop.hidden; });
+    native.addEventListener('input', () => pick(native.value));
+    hex.addEventListener('input', () => { const v = C.hex6(hex.value); if (v) pick(v); else if (!hex.value && empty) pick(''); });
+    if (empty) hex.placeholder = empty;
+    show(cur);
+    return { set: show, get value() { return cur; } };
+  }
+  document.addEventListener('click', (e) => { if (!e.target.closest('.cf')) document.querySelectorAll('.cf-pop').forEach((x) => { x.hidden = true; }); });
+
+  // 主題 → 九個可以調的顏色
+  const COLOR_KEYS = [['wt', '水面'], ['wm', '中間'], ['wb', '深處'], ['air', '天空'], ['sand', '沙子'], ['rock', '石頭'], ['weed', '海草'], ['ray', '光線'], ['line', '水面線']];
+  function themeColors(id) {
+    const th = C.THEMES[id] || C.THEMES.ocean;
+    const ray = '#' + th.ray.split(',').map((v) => (+v).toString(16).padStart(2, '0')).join('');
+    return { wt: th.water[0], wm: th.water[1], wb: th.water[2], air: th.air[1], sand: th.sand[0], rock: th.rock[0], weed: th.weed[0], ray, line: th.line || '#c8f0ff' };
+  }
+  const colorInputs = {};
 
   // 配色主題按鈕（點了就套用，顏色欄位也換成那個主題的顏色）
   for (const [id, th] of Object.entries(C.THEMES)) {
@@ -225,9 +322,8 @@
     b.innerHTML = `<i style="background:linear-gradient(${th.water[0]},${th.water[2]} 70%,${th.sand[0]} 70%)"></i><span>${th.name}</span>`;
     b.addEventListener('click', () => {
       state.theme = id;
-      $('waterTop').value = th.water[0];
-      $('waterBottom').value = th.water[2];
-      $('sandColor').value = th.sand[0];
+      state.colors = themeColors(id);
+      for (const [k] of COLOR_KEYS) colorInputs[k].set(state.colors[k]);
       refresh();
     });
     $('themes').append(b);
@@ -242,12 +338,6 @@
     refresh();
   });
 
-  // 裝飾勾選
-  for (const [id, name] of Object.entries(C.DECOS)) {
-    const l = document.createElement('label');
-    l.innerHTML = `<input type="checkbox" value="${id}"> ${name}`;
-    $('decos').append(l);
-  }
 
   try {
     const s = JSON.parse(localStorage.getItem(SAVE)) || {};
@@ -255,7 +345,14 @@
     state = { ...state, ...(s.state || {}) };
   } catch { /* 沒存過 */ }
   if (!state.skey) state.skey = newKey();
-  for (const c of $('decos').querySelectorAll('input')) c.checked = state.decos.includes(c.value);
+  if (!state.colors) state.colors = themeColors(state.theme);
+  if (!state.objs) state.objs = C.decoToObjects(state.decos || C.DEFAULTS.deco.split(',')); // 舊的裝飾勾選換成物件
+  for (const [k, name] of COLOR_KEYS) {
+    const box = document.createElement('div');
+    box.innerHTML = `<span class="cf-lbl">${name}</span><div></div>`;
+    $('colorRow').append(box);
+    colorInputs[k] = colorField(box.lastChild, { value: state.colors[k], onChange: (v) => { state.colors[k] = v; refresh(); } });
+  }
   for (const c of $('layers').querySelectorAll('input')) c.checked = !state.hide.includes(c.value);
 
   function newKey() {
@@ -279,7 +376,8 @@
     if (+$('max').value !== 60) p.set('max', $('max').value);
     if (+$('idle').value !== 20) p.set('idle', $('idle').value);
     if (+$('event').value !== 15) p.set('event', $('event').value);
-    if (state.decos.join(',') !== C.DEFAULTS.deco) p.set('deco', state.decos.join(','));
+    p.set('objs', C.stringifyObjects(state.objs));
+    for (const u of state.oimgs) p.append('oimg', u);
     if (!$('subs').checked) p.set('subs', '0');
     if (+$('bits').value !== 100) p.set('bits', $('bits').value);
     const rw = C.stringifyRewards(state.rewards);
@@ -287,7 +385,11 @@
     if (!$('pfp').checked) p.set('pfp', '0');
     if (!$('submit').checked) p.set('submit', '0');
     if (state.theme !== 'ocean') p.set('theme', state.theme);
-    if ($('customColor').checked) { p.set('water', $('waterTop').value + ',' + $('waterBottom').value); p.set('sand', $('sandColor').value); }
+    if ($('customColor').checked) {
+      const c = state.colors;
+      p.set('water', [c.wt, c.wm, c.wb].join(','));
+      for (const [k, q] of [['air', 'air'], ['sand', 'sand'], ['rock', 'rock'], ['weed', 'weedc'], ['ray', 'ray'], ['line', 'line']]) p.set(q, c[k]);
+    }
     if (state.hide.length) p.set('hide', state.hide.join(','));
     if (+$('weed').value !== 1) p.set('weed', $('weed').value);
     if (/^https:\/\//.test($('bgimg').value.trim())) p.set('bgimg', $('bgimg').value.trim());
@@ -297,8 +399,9 @@
     return p.toString();
   }
 
-  let timer = 0;
-  function refresh() {
+  let timer = 0, lastPreview = '';
+  // fromPreview：改動是從預覽裡拖曳來的，不用再把物件送回預覽
+  function refresh(fromPreview) {
     for (const k of ['top', 'bottom', 'left', 'right']) $(k + 'V').textContent = Math.round($(k).value * 100) + '%';
     $('scaleV').textContent = $('scale').value + ' 倍';
     $('url').value = new URL('tank.html', location.href).href + '?' + params(false);
@@ -307,19 +410,96 @@
     try { localStorage.setItem(SAVE, JSON.stringify(s)); } catch { /* 無痕模式 */ }
     renderRewards();
     renderSkins();
+    renderObjPanel();
     $('colorRow').hidden = !$('customColor').checked;
     for (const b of $('themes').children) b.classList.toggle('on', b.dataset.theme === state.theme);
     const len = $('url').value.length;
     $('urlMsg').className = 'msg' + (len > 30000 ? ' bad' : '');
     $('urlMsg').textContent = len > 30000 ? `網址太長（${len} 字），OBS 可能貼不進去：請移除一兩張自訂魚種圖片` : '';
-    clearTimeout(timer);
-    timer = setTimeout(() => { $('preview').src = 'tank.html?' + params(true); }, 500);
     listen();
+    if (fromPreview === true) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      // 只有物件變了：直接告訴預覽，不重新載入（魚不會不見）；其他設定變了才重新載入
+      const key = new URLSearchParams(params(true));
+      key.delete('objs');
+      const frame = $('preview').contentWindow;
+      if (key.toString() === lastPreview && frame && frame.FishTank) frame.FishTank.setObjects(state.objs, sel);
+      else { lastPreview = key.toString(); $('preview').src = 'tank.html?' + params(true) + '&edit=1'; }
+    }, 250);
   }
-  for (const k of fields) $(k).addEventListener('input', refresh);
-  $('decos').addEventListener('change', () => {
-    state.decos = [...$('decos').querySelectorAll('input:checked')].map((c) => c.value);
+  for (const k of fields) $(k).addEventListener('input', () => refresh());
+
+  // ───────── 魚缸物件編輯：預覽裡拖曳，這裡加、刪、改大小顏色 ─────────
+  let sel = -1;
+  const objKind = (o) => FishObjects.OBJECTS[o.t] || { name: '自訂物件', color: '' };
+  for (const [id, kind] of Object.entries(FishObjects.OBJECTS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.obj = id;
+    const cv = document.createElement('canvas');
+    cv.width = 128;
+    cv.height = 96;
+    const k = Math.min(110 / kind.w, 84 / kind.h);
+    FishObjects.drawObject(cv.getContext('2d'), { t: id }, 64, 90, k, null, 7);
+    b.append(cv, kind.name);
+    b.addEventListener('click', () => addObject(id));
+    $('objPalette').append(b);
+  }
+  const up = document.createElement('label');
+  up.className = 'up';
+  up.innerHTML = '<b style="font-size:20px">＋</b>上傳圖片<input type="file" id="objFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>';
+  $('objPalette').append(up);
+  function addObject(t) {
+    if (state.objs.length >= 40) return;
+    state.objs.push({ t, x: 0.3 + Math.random() * 0.4, y: null, s: 1, f: false, c: '' });
+    sel = state.objs.length - 1;
     refresh();
+  }
+  $('objFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file || state.oimgs.length >= 10) return;
+    try {
+      state.oimgs.push(await shrink(file, 200));
+      addObject('img' + (state.oimgs.length - 1));
+    } catch (err) { alert('上傳失敗：' + err.message); }
+  });
+  const objColor = colorField($('objColor'), { value: '', empty: '原本的顏色', onChange: (v) => { if (state.objs[sel]) { state.objs[sel].c = v; refresh(); } } });
+  function renderObjPanel() {
+    const o = state.objs[sel];
+    $('objPanel').hidden = !o;
+    $('objCount').textContent = `魚缸裡有 ${state.objs.length} 個物件`;
+    if (!o) return;
+    $('objName').textContent = objKind(o).name;
+    $('objSize').value = o.s;
+    $('objSizeV').textContent = o.s.toFixed(1) + ' 倍';
+    objColor.set(o.c);
+    $('objColor').style.visibility = o.t.startsWith('img') ? 'hidden' : 'visible'; // 自訂圖片不能換色
+    $('objFloor').disabled = o.y === null;
+  }
+  const edit = (fn) => () => { if (state.objs[sel]) { fn(state.objs[sel]); refresh(); } };
+  $('objSize').addEventListener('input', edit((o) => { o.s = +$('objSize').value; }));
+  $('objFlip').addEventListener('click', edit((o) => { o.f = !o.f; }));
+  $('objFloor').addEventListener('click', edit((o) => { o.y = null; }));
+  $('objUp').addEventListener('click', () => { if (sel >= 0 && sel < state.objs.length - 1) { state.objs.push(...state.objs.splice(sel, 1)); sel = state.objs.length - 1; refresh(); } });
+  $('objDown').addEventListener('click', () => { if (sel > 0) { state.objs.unshift(...state.objs.splice(sel, 1)); sel = 0; refresh(); } });
+  $('objCopy').addEventListener('click', () => { const o = state.objs[sel]; if (o && state.objs.length < 40) { state.objs.push({ ...o, x: Math.min(1, o.x + 0.06) }); sel = state.objs.length - 1; refresh(); } });
+  $('objDel').addEventListener('click', () => { if (sel >= 0) { state.objs.splice(sel, 1); sel = -1; pruneImages(); refresh(); } });
+  $('objClear').addEventListener('click', () => { if (confirm('把魚缸裡的物件全部清掉？')) { state.objs = []; sel = -1; pruneImages(); refresh(); } });
+  // 刪掉沒人用的自訂物件圖（網址比較短），並重新編號
+  function pruneImages() {
+    const used = [...new Set(state.objs.filter((o) => o.t.startsWith('img')).map((o) => +o.t.slice(3)))].sort((a, b) => a - b);
+    const map = new Map(used.map((old, i) => [old, i]));
+    state.oimgs = used.map((i) => state.oimgs[i]);
+    for (const o of state.objs) if (o.t.startsWith('img')) o.t = 'img' + map.get(+o.t.slice(3));
+  }
+  // 預覽裡拖曳、選取、滾輪調大小
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data || !e.data.fishtank) return;
+    state.objs = e.data.objects.map((o) => ({ ...o }));
+    sel = e.data.selected;
+    refresh(true);
   });
 
   // ───────── 忠誠點品項偵測（聽聊天室裡帶 custom-reward-id 的訊息） ─────────
@@ -394,11 +574,11 @@
   }
   $('skinAdd').addEventListener('click', () => addSkin($('skinName').value, $('skinUrl').value.trim()));
   // 上傳：在瀏覽器裡縮小成最寬 160 像素的 WebP，直接變成網址的一部分（不用任何帳號）
-  async function shrink(file) {
+  async function shrink(file, max = 160) {
     const url = URL.createObjectURL(file);
     try {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('這個檔案不是圖片')); i.src = url; });
-      const k = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(img.naturalWidth * k));
       c.height = Math.max(1, Math.round(img.naturalHeight * k));

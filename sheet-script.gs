@@ -7,7 +7,7 @@
  */
 const KEY = '__KEY__'; // 設定頁複製時自動填入的暗號，OBS 網址裡要有同一組才能讀寫
 const SHEET = '水族箱的魚';
-const HEAD = ['帳號', '顯示名稱', '魚種', '顏色', '大小', '解鎖的稀有魚種', '最後更新', '頭像', '配件', '花紋', '個人魚圖片'];
+const HEAD = ['帳號', '顯示名稱', '魚種', '顏色', '大小', '解鎖的稀有魚種', '最後更新', '頭像', '配件', '花紋', '個人魚圖片', '副色', '配件色', '體型', '名牌', '表情'];
 
 function doGet() {
   return out_({ ok: true, hello: '直播水族箱' });
@@ -33,7 +33,7 @@ function sheet_() {
   if (!sh) {
     sh = ss.insertSheet(SHEET);
     sh.setFrozenRows(1);
-    sh.getRange('A:F').setNumberFormat('@'); // 帳號像 0123 這種才不會被當成數字
+    sh.getRange('A:P').setNumberFormat('@'); // 帳號像 0123 這種才不會被當成數字，色碼也不會被改掉
   }
   // 舊版試算表少了後面幾欄的標題，補上
   const head = sh.getRange(1, 1, 1, HEAD.length);
@@ -63,6 +63,11 @@ function list_() {
       wear: String(r[8] || '') || null,
       pattern: String(r[9] || '') || null,
       mine: /^https:\/\//.test(String(r[10] || '')) ? String(r[10]) : null,
+      color2: String(r[11] || '') || null,
+      wearColor: String(r[12] || '') || null,
+      sizePick: String(r[13] || '') || null,
+      tag: String(r[14] || '') || null,
+      face: String(r[15] || '') || null,
     };
   });
   return out;
@@ -78,7 +83,7 @@ function save_(profiles) {
     const login = String(p.login || '').trim().toLowerCase();
     if (!login) return;
     const avatar = p.avatar && p.avatar.url ? p.avatar.kind + '|' + p.avatar.url : '';
-    const row = [login, p.display || login, p.species || '', p.color || '', p.size || 1, (p.unlocked || []).join(','), now, avatar, p.wear || '', p.pattern || '', p.mine || ''];
+    const row = [login, p.display || login, p.species || '', p.color || '', p.size || 1, (p.unlocked || []).join(','), now, avatar, p.wear || '', p.pattern || '', p.mine || '', p.color2 || '', p.wearColor || '', p.sizePick || '', p.tag || '', p.face || ''];
     if (index[login]) sh.getRange(index[login], 1, 1, row.length).setValues([row]);
     else { sh.appendRow(row); index[login] = sh.getLastRow(); }
   });

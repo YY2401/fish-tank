@@ -38,7 +38,7 @@
   let saveTimer = 0;
   const dirty = new Set(); // 還沒寫進試算表的帳號
   function saveProfile(f) {
-    profiles[f.login] = { display: f.display, species: f.species, color: f.color, size: +f.size.toFixed(2), unlocked: f.unlocked.slice(), avatar: f.avatar, wear: f.wear, pattern: f.pattern, mine: f.mine };
+    profiles[f.login] = { display: f.display, species: f.species, color: f.color, size: +f.size.toFixed(2), unlocked: f.unlocked.slice(), avatar: f.avatar, wear: f.wear, pattern: f.pattern, mine: f.mine, color2: f.color2, wearColor: f.wearColor, sizePick: f.sizePick, tag: f.tag, face: f.expr };
     dirty.add(f.login);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(profiles)); } catch { /* 無痕或封鎖儲存：只是不記外觀 */ } }, 500);
@@ -49,6 +49,12 @@
     if (C.SPECIES[p.species] || SKIN[p.species]) f.species = p.species;
     f.wear = C.WEARS[p.wear] ? p.wear : null;
     f.pattern = C.PATTERNS[p.pattern] ? p.pattern : null;
+    const okColor = (v) => (v === 'rainbow' || C.hex6(v) ? v : null);
+    f.color2 = okColor(p.color2);
+    f.wearColor = okColor(p.wearColor);
+    f.sizePick = C.SIZES[p.sizePick] ? p.sizePick : null;
+    f.tag = p.tag === 'hide' || C.hex6(p.tag) ? p.tag : null;
+    f.expr = C.EXPRESSIONS[p.face] ? p.face : null; // 表情（f.face 是魚頭朝哪邊）
     f.color = p.color || null;
     f.size = clamp(+p.size || 1, 0.6, 2);
     f.unlocked = Array.isArray(p.unlocked) ? p.unlocked.filter((id) => C.SPECIES[id]) : [];
@@ -245,121 +251,47 @@
   }
 
   // ───────── 魚缸裝飾（城堡、寶箱、珊瑚、打氣石），透明模式也畫在底部 ─────────
+  // ───────── 魚缸物件：位置、大小、翻轉、顏色都可以在設定頁拖拉編輯（畫法在 objects.js） ─────────
+  const objects = opt.objects.map((o) => ({ ...o }));
+  let selected = -1; // 編輯模式選到的物件
+  // 物件在畫面上的底部中間座標與縮放
+  function objectPlace(o) {
+    return {
+      x: X0 + o.x * TW,
+      y: o.y === null ? floorY + 8 * S : Y0 + o.y * (Y1 - Y0),
+      k: DS * o.s,
+    };
+  }
+  function objectImage(o) {
+    const m = /^img(\d)$/.exec(o.t);
+    return m ? image(opt.objimgs[+m[1]]) : null;
+  }
+  // 物件的範圍（點選、拖曳用）
+  function objectBox(o) {
+    const { x, y, k } = objectPlace(o);
+    const { w, h } = FishObjects.sizeOf(o, objectImage(o));
+    return { x: x - (w * k) / 2, y: y - h * k, w: w * k, h: h * k };
+  }
   function buildDecorations() {
     emitters = [];
     decoLayer = null;
-    if (!opt.deco.length) return;
+    DS = S * clamp((floorY - surfaceY) / (420 * S), 0.4, 1); // 魚缸矮的時候物件跟著縮小
+    if (!objects.length) return;
     const [c, b] = layer();
     decoLayer = c;
-    const n = opt.deco.length;
-    DS = S * clamp((floorY - surfaceY) / (420 * S), 0.4, 1); // 魚缸矮的時候裝飾跟著縮小
-    const base = floorY + 8 * S;
-    opt.deco.forEach((d, i) => {
-      // 平均分散在底部，避開正中間（魚最常經過）
-      const x = X0 + TW * ((i + 0.5) / n) * 0.84 + TW * 0.08 + rand(-30, 30) * S;
-      ({ castle: drawCastle, chest: drawChestDeco, coral: drawCoral, bubbler: drawBubbler })[d](b, x, base);
-    });
-  }
-
-  function drawCastle(b, x, base) {
-    const s = DS * 1.1;
-    const stone = b.createLinearGradient(0, base - 150 * s, 0, base);
-    stone.addColorStop(0, '#a99cc0');
-    stone.addColorStop(1, '#5d5470');
-    b.fillStyle = stone;
-    const tower = (tx, w, h) => {
-      b.fillRect(tx - w / 2, base - h, w, h);
-      for (let k = 0; k < 3; k++) b.fillRect(tx - w / 2 + k * (w / 2.5), base - h - 8 * s, w / 5, 8 * s);
-    };
-    tower(x, 90 * s, 80 * s);
-    tower(x - 52 * s, 36 * s, 130 * s);
-    tower(x + 52 * s, 36 * s, 130 * s);
-    b.fillStyle = '#c4507a';
-    for (const tx of [x - 52 * s, x + 52 * s]) {
-      b.beginPath();
-      b.moveTo(tx - 22 * s, base - 136 * s);
-      b.lineTo(tx, base - 175 * s);
-      b.lineTo(tx + 22 * s, base - 136 * s);
-      b.fill();
-    }
-    b.fillStyle = '#1c1830';
-    b.beginPath();
-    b.moveTo(x - 16 * s, base);
-    b.lineTo(x - 16 * s, base - 30 * s);
-    b.arc(x, base - 30 * s, 16 * s, Math.PI, 0);
-    b.lineTo(x + 16 * s, base);
-    b.fill();
-    for (const [wx, wy] of [[-52, 100], [52, 100], [-52, 65], [52, 65]]) {
-      b.beginPath();
-      b.roundRect(x + wx * s - 5 * s, base - wy * s, 10 * s, 16 * s, [5 * s, 5 * s, 0, 0]);
-      b.fill();
-    }
-    emitters.push({ x, y: base - 30 * s, kind: 'door' });
-  }
-
-  function drawChestDeco(b, x, base) {
-    const s = DS * 1.2;
-    const w = 70 * s, h = 34 * s;
-    // 打開的蓋子
-    b.fillStyle = '#7a4a22';
-    b.beginPath();
-    b.moveTo(x - w / 2, base - h);
-    b.lineTo(x - w / 2 + 6 * s, base - h - 34 * s);
-    b.lineTo(x + w / 2 + 6 * s, base - h - 34 * s);
-    b.lineTo(x + w / 2, base - h);
-    b.fill();
-    // 金幣
-    b.fillStyle = '#ffd23f';
-    for (let i = 0; i < 9; i++) {
-      b.beginPath();
-      b.arc(x - w / 2 + 10 * s + i * 6.5 * s, base - h - 2 * s - Math.sin(i * 1.3) * 4 * s, 6 * s, 0, TAU);
-      b.fill();
-    }
-    b.fillStyle = '#a8662e';
-    b.fillRect(x - w / 2, base - h, w, h);
-    b.fillStyle = '#d6a43a';
-    b.fillRect(x - w / 2, base - h, w, 5 * s);
-    b.fillRect(x - 6 * s, base - h, 12 * s, 16 * s);
-    b.fillRect(x - w / 2 + 8 * s, base - h, 5 * s, h);
-    b.fillRect(x + w / 2 - 13 * s, base - h, 5 * s, h);
-    emitters.push({ x, y: base - h - 6 * s, kind: 'chest' });
-  }
-
-  function drawCoral(b, x, base) {
-    const branch = (bx, by, ang, len, w, color, depth) => {
-      const ex = bx + Math.cos(ang) * len, ey = by + Math.sin(ang) * len;
-      b.strokeStyle = color;
-      b.lineWidth = w;
-      b.lineCap = 'round';
-      b.beginPath();
-      b.moveTo(bx, by);
-      b.lineTo(ex, ey);
-      b.stroke();
-      if (depth > 0) {
-        branch(ex, ey, ang - rand(0.25, 0.6), len * 0.75, w * 0.72, color, depth - 1);
-        branch(ex, ey, ang + rand(0.25, 0.6), len * 0.75, w * 0.72, color, depth - 1);
+    objects.forEach((o, i) => {
+      const { x, y, k } = objectPlace(o);
+      const m = /^img(\d)$/.exec(o.t);
+      const im = objectImage(o);
+      if (m && !im) { // 自訂物件的圖還沒載好：載好再重畫
+        const pendingImg = images.get(opt.objimgs[+m[1]]);
+        if (pendingImg) pendingImg.addEventListener('load', buildDecorations, { once: true });
+        return;
       }
-    };
-    branch(x - 18 * DS, base, -Math.PI / 2 - 0.15, 42 * DS, 10 * DS, '#ff7a9a', 3);
-    branch(x + 22 * DS, base, -Math.PI / 2 + 0.2, 32 * DS, 8 * DS, '#ff9a4a', 3);
-    b.fillStyle = '#ffb3c6';
-    for (let i = 0; i < 6; i++) {
-      b.beginPath();
-      b.arc(x + rand(-50, 50) * DS, base - rand(0, 6) * DS, rand(3, 6) * DS, 0, TAU);
-      b.fill();
-    }
-  }
-
-  function drawBubbler(b, x, base) {
-    b.fillStyle = '#5f6b75';
-    b.beginPath();
-    b.ellipse(x, base - 4 * DS, 16 * DS, 9 * DS, 0, 0, TAU);
-    b.fill();
-    b.fillStyle = 'rgba(255,255,255,0.25)';
-    b.beginPath();
-    b.ellipse(x - 4 * DS, base - 8 * DS, 6 * DS, 3 * DS, 0, 0, TAU);
-    b.fill();
-    emitters.push({ x, y: base - 10 * DS, kind: 'bubbler' });
+      FishObjects.drawObject(b, o, x, y, k, im, i * 7919 + 13);
+      const kind = FishObjects.OBJECTS[o.t];
+      for (const [ex, ey] of (kind && kind.emit) || []) emitters.push({ x: x + (o.f ? -ex : ex) * k, y: y + ey * k, kind: kind.fast ? 'bubbler' : o.t === 'chest' ? 'chest' : 'door' });
+    });
   }
 
   // ───────── 顏色小工具 ─────────
@@ -379,6 +311,13 @@
     const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
     return '#' + [f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, '0')).join('');
   }
+  // 副色（鰭、尾巴、花紋）、配件色：沒設定就用 fallback
+  function tint(v, f, fallback) {
+    if (v === 'rainbow') return hslHex((now / 20 + f.hue + 120) % 360, 85, 60);
+    return v || fallback;
+  }
+  const fin = (f, fallback) => tint(f.color2, f, fallback);
+
   function colorOf(f) {
     if (f.color === 'rainbow') return hslHex((now / 20 + f.hue) % 360, 85, 60);
     return f.color || spec(f.species).color;
@@ -406,7 +345,7 @@
   }
 
   // ───────── 魚 ─────────
-  function bodyLen(f) { return 44 * S * opt.scale * spec(f.species).scale * f.size; }
+  function bodyLen(f) { return 44 * S * opt.scale * spec(f.species).scale * f.size * (f.sizePick ? C.SIZES[f.sizePick].k : 1); }
   // 魚身往上、往下各佔幾倍身長（放名字和泡泡用）
   const TOP = { goldfish: 0.36, clown: 0.32, puffer: 0.32, angel: 0.72, shark: 0.36, jelly: 0.38, whale: 0.24, narwhal: 0.22, koi: 0.24 };
   const BOTTOM = { goldfish: 0.28, clown: 0.26, puffer: 0.3, angel: 0.72, shark: 0.28, jelly: 0.72, whale: 0.22, narwhal: 0.18, koi: 0.2 };
@@ -433,7 +372,7 @@
       display: msg.display || msg.login,
       badges: msg.badges || {},
       species: C.defaultSpecies(msg.login),
-      color: null, size: 1, unlocked: [], avatar: null, wear: null, pattern: null, mine: null,
+      color: null, size: 1, unlocked: [], avatar: null, wear: null, pattern: null, mine: null, color2: null, wearColor: null, sizePick: null, tag: null, expr: null,
       hue: C.hashStr(msg.login) % 360,
       x: rx(0.1, 0.9),
       y: surfaceY - 30 * S,
@@ -644,6 +583,43 @@
       case 'mine':
         submitMine(f, cmd.arg);
         break;
+      case 'color2':
+      case 'wearcolor': {
+        const key = cmd.cmd === 'color2' ? 'color2' : 'wearColor';
+        const c = C.OFF.includes(cmd.arg.trim()) ? '' : C.findColor(cmd.arg);
+        if (c === null) { speak(f, `試試 !${cmd.cmd === 'color2' ? '副色' : '配件色'} 紅／藍／粉／彩虹／#ff66aa`, 6, 40); break; }
+        f[key] = c || null;
+        if (c) poof(f);
+        saveProfile(f);
+        break;
+      }
+      case 'size': {
+        const id = C.findSize(cmd.arg);
+        if (id === null) { speak(f, '大小可以選：小、中、大'); break; }
+        f.sizePick = id && id !== 'medium' ? id : null;
+        poof(f);
+        saveProfile(f);
+        break;
+      }
+      case 'tag': {
+        const a = cmd.arg.trim().toLowerCase();
+        if (['隱藏', '關', '關掉', 'hide', 'off'].includes(a)) f.tag = 'hide';
+        else if (['顯示', '開', 'show', 'on', '白'].includes(a)) f.tag = null;
+        else {
+          const c = C.findColor(a);
+          if (!c || c === 'rainbow') { speak(f, '試試 !名牌 粉、!名牌 #66ccff、!名牌 隱藏', 6, 40); break; }
+          f.tag = c;
+        }
+        saveProfile(f);
+        break;
+      }
+      case 'face': {
+        const id = C.findExpression(cmd.arg);
+        if (id === null) { speak(f, '表情有：' + Object.values(C.EXPRESSIONS).map((e) => e.name).join('、') + '（!表情 關 換回來）', 6, 60); break; }
+        f.expr = id || null;
+        saveProfile(f);
+        break;
+      }
       case 'follow':
       case 'hug': {
         const other = cmd.target && fishes.get(cmd.target);
@@ -1147,6 +1123,7 @@
     for (const p of parts) drawPart(p);
     ctx.restore();
     drawLabels(list);
+    drawSelection();
   }
 
   function drawRays(t) {
@@ -1172,7 +1149,8 @@
   function drawSurface(t) {
     if ((opt.bg !== 'tank' && opt.top === 0) || opt.hide.includes('surface')) return;
     ctx.save();
-    ctx.strokeStyle = 'rgba(200,240,255,0.55)';
+    ctx.strokeStyle = opt.theme.line;
+    ctx.globalAlpha = 0.6;
     ctx.lineWidth = 2 * S;
     ctx.beginPath();
     for (let x = X0; x <= X1; x += 10) {
@@ -1380,7 +1358,7 @@
     ctx.beginPath();
     ctx.rect(-b.rx * 1.2, -b.ry * 1.2, b.rx * (b.dome ? 2.4 : 1.55), b.ry * 2.4);
     ctx.clip();
-    ctx.fillStyle = ink;
+    ctx.fillStyle = f.color2 ? tint(f.color2, f, ink) : ink;
     const seed = f.hue;
     const u = Math.max(L * 0.05, 2 * S);
     if (f.pattern === 'stripes') {
@@ -1417,21 +1395,22 @@
     const b = bodyOf(f, L);
     const u = clamp(L * 0.2, 7 * S, 30 * S);
     const x = b.hx, y = b.hy;
+    const wc = (d) => tint(f.wearColor, f, d);
     ctx.save();
     ctx.lineJoin = 'round';
     switch (f.wear) {
       case 'hat': // 禮帽
-        ctx.fillStyle = '#22222a';
+        ctx.fillStyle = wc('#22222a');
         ctx.fillRect(x - u * 0.45, y - u * 1.0, u * 0.9, u * 0.95);
         ctx.fillStyle = '#c0304a';
         ctx.fillRect(x - u * 0.45, y - u * 0.3, u * 0.9, u * 0.2);
-        ctx.fillStyle = '#22222a';
+        ctx.fillStyle = wc('#22222a');
         ctx.beginPath();
         ctx.ellipse(x, y, u * 0.8, u * 0.16, 0, 0, TAU);
         ctx.fill();
         break;
       case 'crown':
-        ctx.fillStyle = '#ffcf3a';
+        ctx.fillStyle = wc('#ffcf3a');
         ctx.strokeStyle = '#c99400';
         ctx.lineWidth = Math.max(1, u * 0.06);
         ctx.beginPath();
@@ -1449,7 +1428,7 @@
         for (const dx of [-0.32, 0, 0.32]) { ctx.beginPath(); ctx.arc(x + dx * u, y - u * 0.12, u * 0.09, 0, TAU); ctx.fill(); }
         break;
       case 'glasses': // 墨鏡：一片鏡片蓋在眼睛上，鏡腳往後
-        ctx.fillStyle = 'rgba(20,20,30,0.92)';
+        ctx.fillStyle = wc('rgba(20,20,30,0.92)');
         ctx.strokeStyle = '#111';
         ctx.lineWidth = Math.max(1.2, u * 0.1);
         ctx.beginPath();
@@ -1463,7 +1442,7 @@
         ctx.fillRect(b.ex - u * 0.18, b.ey - u * 0.14, u * 0.12, u * 0.12);
         break;
       case 'bow':
-        ctx.fillStyle = '#ff6fae';
+        ctx.fillStyle = wc('#ff6fae');
         ctx.beginPath();
         ctx.moveTo(x - u * 0.15, y - u * 0.15);
         ctx.lineTo(x - u * 0.7, y - u * 0.5);
@@ -1480,7 +1459,7 @@
         ctx.fill();
         break;
       case 'pirate':
-        ctx.fillStyle = '#1d1d22';
+        ctx.fillStyle = wc('#1d1d22');
         ctx.beginPath();
         ctx.moveTo(x - u * 0.9, y + u * 0.05);
         ctx.quadraticCurveTo(x - u * 0.6, y - u * 0.9, x, y - u * 0.75);
@@ -1496,7 +1475,7 @@
       case 'flower':
         for (let i = 0; i < 5; i++) {
           const a = (i / 5) * TAU - Math.PI / 2;
-          ctx.fillStyle = i % 2 ? '#ff8ac0' : '#ffa8d0';
+          ctx.fillStyle = i % 2 ? wc('#ff8ac0') : f.wearColor ? shade(C.hex6(f.wearColor) || '#ffa8d0', 0.25) : '#ffa8d0';
           ctx.beginPath();
           ctx.arc(x + Math.cos(a) * u * 0.3, y - u * 0.35 + Math.sin(a) * u * 0.3, u * 0.22, 0, TAU);
           ctx.fill();
@@ -1512,14 +1491,14 @@
         ctx.beginPath();
         ctx.arc(x - u * 0.15, y + u * 0.35, u * 0.6, Math.PI * 1.1, Math.PI * 1.9);
         ctx.stroke();
-        ctx.fillStyle = '#ff5a5a';
+        ctx.fillStyle = wc('#ff5a5a');
         ctx.beginPath();
         ctx.ellipse(b.ex - u * 0.55, b.ey, u * 0.22, u * 0.3, 0, 0, TAU);
         ctx.fill();
         break;
       case 'halo': {
         const fy = y - u * 0.55 + Math.sin(t * 3 + f.hue) * u * 0.08;
-        ctx.strokeStyle = '#ffe37a';
+        ctx.strokeStyle = wc('#ffe37a');
         ctx.lineWidth = Math.max(2, u * 0.14);
         ctx.shadowColor = '#fff3b0';
         ctx.shadowBlur = 8 * S;
@@ -1567,7 +1546,25 @@
   }
 
   function eye(x, y, r, f) {
-    if (f.state === 'sleep') {
+    const ink = '#14141c';
+    const line = (w) => { ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, r * w); ctx.lineCap = 'round'; };
+    if (f.state === 'sleep' || f.expr === 'sleepy') {
+      if (f.expr === 'sleepy' && f.state !== 'sleep') { // 半閉的眼睛
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI);
+        ctx.fill();
+        ctx.fillStyle = ink;
+        ctx.beginPath();
+        ctx.arc(x + r * 0.25, y + r * 0.15, r * 0.5, 0, Math.PI);
+        ctx.fill();
+        line(0.3);
+        ctx.beginPath();
+        ctx.moveTo(x - r, y);
+        ctx.lineTo(x + r, y);
+        ctx.stroke();
+        return;
+      }
       ctx.strokeStyle = '#1a1a22';
       ctx.lineWidth = Math.max(1, r * 0.4);
       ctx.beginPath();
@@ -1575,18 +1572,51 @@
       ctx.stroke();
       return;
     }
+    if (f.expr === 'happy' || f.expr === 'wink') { // ^ 形的笑眼
+      line(0.35);
+      ctx.beginPath();
+      ctx.arc(x, y + r * 0.3, r * 0.75, 1.15 * Math.PI, 1.85 * Math.PI);
+      ctx.stroke();
+      if (f.expr === 'happy') return;
+    }
+    if (f.expr === 'wink') return;
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
+    ctx.arc(x, y, r * (f.expr === 'surprised' ? 1.25 : 1), 0, TAU);
     ctx.fill();
-    ctx.fillStyle = '#14141c';
+    if (f.expr === 'love' || f.expr === 'star') { // 愛心眼、星星眼
+      ctx.fillStyle = f.expr === 'love' ? '#ff3d7a' : '#ffc400';
+      ctx.beginPath();
+      if (f.expr === 'love') heartPath(x + r * 0.1, y + r * 0.1, r * 0.75);
+      else starPath(x + r * 0.1, y, r * 0.95, r * 0.42);
+      ctx.fill();
+      return;
+    }
+    if (f.expr === 'dizzy') { // 漩渦眼
+      line(0.18);
+      ctx.beginPath();
+      for (let i = 0; i < 24; i++) {
+        const a = i * 0.55, rr = (i / 24) * r * 0.8;
+        i ? ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+      return;
+    }
+    ctx.fillStyle = ink;
     ctx.beginPath();
-    ctx.arc(x + r * 0.25, y, r * 0.6, 0, TAU);
+    ctx.arc(x + r * 0.25, y, r * (f.expr === 'surprised' ? 0.35 : 0.6), 0, TAU);
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(x + r * 0.4, y - r * 0.3, r * 0.22, 0, TAU);
     ctx.fill();
+    if (f.expr === 'angry') { // 斜斜的眉毛
+      line(0.35);
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.9, y - r * 1.35);
+      ctx.lineTo(x + r * 0.9, y - r * 0.75);
+      ctx.stroke();
+    }
   }
 
   function bodyFill(L, c, h) {
@@ -1598,7 +1628,7 @@
   }
 
   function drawGoldfish(L, c, sw, f) {
-    ctx.fillStyle = shade(c, -0.05);
+    ctx.fillStyle = fin(f, shade(c, -0.05));
     ctx.globalAlpha *= 0.9;
     ctx.beginPath();
     ctx.moveTo(-L * 0.3, 0);
@@ -1623,9 +1653,9 @@
   }
 
   function drawClown(L, c, sw, f) {
-    const fin = (path) => { ctx.fillStyle = c; ctx.strokeStyle = '#111'; ctx.lineWidth = L * 0.025; ctx.beginPath(); path(); ctx.fill(); ctx.stroke(); };
-    fin(() => { ctx.moveTo(-L * 0.36, 0); ctx.quadraticCurveTo(-L * 0.62, -L * 0.28 + sw, -L * 0.6, sw); ctx.quadraticCurveTo(-L * 0.62, L * 0.28 + sw, -L * 0.36, 0); });
-    fin(() => { ctx.moveTo(-L * 0.2, -L * 0.18); ctx.quadraticCurveTo(0, -L * 0.42, L * 0.15, -L * 0.2); });
+    const finPath = (path) => { ctx.fillStyle = fin(f, c); ctx.strokeStyle = '#111'; ctx.lineWidth = L * 0.025; ctx.beginPath(); path(); ctx.fill(); ctx.stroke(); };
+    finPath(() => { ctx.moveTo(-L * 0.36, 0); ctx.quadraticCurveTo(-L * 0.62, -L * 0.28 + sw, -L * 0.6, sw); ctx.quadraticCurveTo(-L * 0.62, L * 0.28 + sw, -L * 0.36, 0); });
+    finPath(() => { ctx.moveTo(-L * 0.2, -L * 0.18); ctx.quadraticCurveTo(0, -L * 0.42, L * 0.15, -L * 0.2); });
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(0, 0, L * 0.42, L * 0.24, 0, 0, TAU);
@@ -1652,7 +1682,7 @@
 
   function drawPuffer(L, c, sw, f) {
     const r = L * 0.3 * (1 + f.puff * 0.55);
-    ctx.fillStyle = shade(c, -0.15);
+    ctx.fillStyle = fin(f, shade(c, -0.15));
     ctx.beginPath();
     ctx.moveTo(-r * 0.9, 0);
     ctx.lineTo(-r * 0.9 - L * 0.22, -L * 0.14 + sw);
@@ -1697,7 +1727,7 @@
 
   function drawAngel(L, c, sw, f) {
     const dark = shade(c, -0.45);
-    ctx.fillStyle = shade(c, -0.1);
+    ctx.fillStyle = fin(f, shade(c, -0.1));
     ctx.beginPath();
     ctx.moveTo(L * 0.05, -L * 0.24);
     ctx.quadraticCurveTo(-L * 0.15, -L * 0.75, -L * 0.42, -L * 0.72 + sw * 0.5);
@@ -1728,7 +1758,7 @@
   }
 
   function drawShark(L, c, sw, f, angry) {
-    ctx.fillStyle = shade(c, -0.15);
+    ctx.fillStyle = fin(f, shade(c, -0.15));
     ctx.beginPath();
     ctx.moveTo(-L * 0.4, 0);
     ctx.lineTo(-L * 0.68, -L * 0.3 + sw * 1.3);
@@ -1756,7 +1786,7 @@
     ctx.ellipse(L * 0.05, L * 0.14, L * 0.5, L * 0.1, 0, 0, TAU);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = shade(c, -0.2);
+    ctx.fillStyle = fin(f, shade(c, -0.2));
     ctx.beginPath();
     ctx.moveTo(L * 0.12, L * 0.08);
     ctx.lineTo(-L * 0.05, L * 0.28 + sw * 0.4);
@@ -1798,7 +1828,7 @@
       ctx.quadraticCurveTo(L * 0.38, L * 0.09, L * 0.32, L * 0.07);
       ctx.stroke();
     }
-    if (f.state === 'sleep') eye(L * 0.36, -L * 0.04, L * 0.03, f);
+    if (f.state === 'sleep' || f.expr) eye(L * 0.36, -L * 0.04, L * 0.035, f);
     else {
       ctx.fillStyle = '#111';
       ctx.beginPath();
@@ -1808,9 +1838,9 @@
   }
 
   // 鯨魚和獨角鯨共用身形；slim 讓獨角鯨細一點
-  function whaleBody(L, c, sw, slim) {
+  function whaleBody(L, c, sw, slim, f) {
     const k = slim ? 0.8 : 1;
-    ctx.fillStyle = shade(c, -0.15);
+    ctx.fillStyle = fin(f, shade(c, -0.15));
     ctx.beginPath();
     ctx.moveTo(-L * 0.46, 0);
     ctx.quadraticCurveTo(-L * 0.58, -L * 0.18 * k + sw, -L * 0.72, -L * 0.15 * k + sw * 1.4);
@@ -1832,7 +1862,7 @@
   }
 
   function drawWhale(L, c, sw, f) {
-    whaleBody(L, c, sw, false);
+    whaleBody(L, c, sw, false, f);
     ctx.fillStyle = 'rgba(238,242,248,0.92)';
     ctx.beginPath();
     ctx.ellipse(L * 0.12, L * 0.17, L * 0.42, L * 0.08, 0, 0, TAU);
@@ -1846,7 +1876,7 @@
       ctx.stroke();
     }
     ctx.restore();
-    ctx.fillStyle = shade(c, -0.2);
+    ctx.fillStyle = fin(f, shade(c, -0.2));
     ctx.beginPath();
     ctx.ellipse(L * 0.1, L * 0.14, L * 0.12, L * 0.035, 0.5 + sw / L, 0, TAU);
     ctx.fill();
@@ -1877,7 +1907,7 @@
       ctx.lineTo(x + L * 0.02, y + L * 0.012);
       ctx.stroke();
     }
-    whaleBody(L, c, sw, true);
+    whaleBody(L, c, sw, true, f);
     ctx.fillStyle = shade(c, -0.35);
     for (let i = 0; i < 14; i++) {
       const x = L * (-0.35 + ((i * 37) % 70) / 100), y = -L * (0.02 + ((i * 13) % 10) / 100);
@@ -1893,7 +1923,7 @@
     // 沒換色時白底橘紅斑；換了顏色就把斑點換成那個顏色
     const base = f.color ? '#f6f2ea' : c;
     const patch = f.color ? c : '#ff5a2a';
-    ctx.fillStyle = shade(base, -0.05);
+    ctx.fillStyle = fin(f, shade(base, -0.05));
     ctx.globalAlpha *= 0.85;
     ctx.beginPath();
     ctx.moveTo(-L * 0.38, 0);
@@ -1932,7 +1962,7 @@
     ctx.save();
     ctx.shadowColor = c;
     ctx.shadowBlur = 14 * S;
-    ctx.strokeStyle = shade(c, 0.3);
+    ctx.strokeStyle = fin(f, shade(c, 0.3));
     ctx.lineWidth = 2 * S;
     ctx.globalAlpha *= 0.75;
     for (let i = 0; i < 5; i++) {
@@ -2027,6 +2057,7 @@
     ctx.strokeStyle = 'rgba(0,20,40,0.85)';
     const rank = (f) => (f.badges.broadcaster ? 4 : f.badges.mod ? 3 : f.badges.vip || f.badges.sub ? 2 : 0) * 1e9 + f.last;
     for (const f of [...list].sort((a, b) => rank(b) - rank(a))) {
+      if (f.tag === 'hide') continue; // 觀眾自己把名牌藏起來
       const name = badgeIcon(f.badges) + f.display;
       const w = ctx.measureText(name).width + 6 * S;
       const r = { x: f.x - w / 2, y: f.y + extent(f, BOTTOM) + 4 * S, w, h: 16 * S };
@@ -2036,7 +2067,7 @@
       if (f.nameA < 0.03) continue;
       ctx.globalAlpha = f.alpha * f.nameA;
       ctx.strokeText(name, f.x, r.y);
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = f.tag || '#fff';
       ctx.fillText(name, f.x, r.y);
     }
     ctx.restore();
@@ -2071,6 +2102,8 @@
     '<b>!跳</b> <b>!衝</b> <b>!轉</b> <b>!睡</b> <b>!泡泡</b> 做動作',
     '<b>!餵</b> 自己吃、<b>!餵 @名字</b> 請別人吃、<b>!餵 大家</b> 全場吃',
     '<b>!頭像</b> 加一個表情符號，把它放到魚身上' + (opt.pfp ? '；<b>!頭像 大頭貼</b> 用 Twitch 大頭貼' : ''),
+    '<b>!戴 皇冠</b>、<b>!花紋 星星</b>、<b>!副色 藍</b>、<b>!配件色 粉</b> 打扮自己的魚',
+    '<b>!表情 開心</b>、<b>!大小 大</b>、<b>!名牌 粉</b>（<b>!名牌 隱藏</b> 把名字藏起來）',
     '<b>!抱 @名字</b> 抱抱、<b>!跟 @名字</b> 跟著游',
     `稀有魚種 <b>鯨魚</b> <b>獨角鯨</b> <b>錦鯉</b>：${rareHint()}`,
   ];
@@ -2184,9 +2217,84 @@
   }
   requestAnimationFrame(frame);
 
+  // 編輯模式（設定頁的預覽，網址有 edit=1）：拖曳物件移動、滾輪調大小，改了就通知設定頁
+  function notifyEditor(type) {
+    if (window.parent !== window) window.parent.postMessage({ fishtank: type, objects, selected }, location.origin);
+  }
+  function setupEditor() {
+    let drag = null;
+    const at = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+    };
+    const hitObject = (p) => {
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const b = objectBox(objects[i]);
+        const pad = 6 * S;
+        if (p.x >= b.x - pad && p.x <= b.x + b.w + pad && p.y >= b.y - pad && p.y <= b.y + b.h + pad) return i;
+      }
+      return -1;
+    };
+    canvas.style.cursor = 'grab';
+    canvas.addEventListener('pointerdown', (e) => {
+      const p = at(e);
+      selected = hitObject(p);
+      notifyEditor('select');
+      if (selected < 0) return;
+      const pl = objectPlace(objects[selected]);
+      drag = { dx: p.x - pl.x, dy: p.y - pl.y };
+      canvas.setPointerCapture(e.pointerId);
+      canvas.style.cursor = 'grabbing';
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const p = at(e);
+      if (!drag) { canvas.style.cursor = hitObject(p) >= 0 ? 'grab' : 'default'; return; }
+      const o = objects[selected];
+      o.x = clamp((p.x - drag.dx - X0) / TW, 0, 1);
+      const yy = clamp((p.y - drag.dy - Y0) / (Y1 - Y0), 0, 1);
+      // 靠近沙地就黏在沙地上（換魚缸大小時也會跟著沙地）
+      o.y = Math.abs(Y0 + yy * (Y1 - Y0) - (floorY + 8 * S)) < 14 * S ? null : yy;
+      buildDecorations();
+    });
+    const end = () => {
+      if (!drag) return;
+      drag = null;
+      canvas.style.cursor = 'grab';
+      notifyEditor('objects');
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('wheel', (e) => {
+      if (selected < 0) return;
+      e.preventDefault();
+      const o = objects[selected];
+      o.s = clamp(+(o.s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)).toFixed(2), 0.2, 4);
+      buildDecorations();
+      notifyEditor('objects');
+    }, { passive: false });
+  }
+  function drawSelection() {
+    if (!opt.edit || selected < 0 || !objects[selected]) return;
+    const b = objectBox(objects[selected]);
+    ctx.save();
+    ctx.strokeStyle = '#ffd84a';
+    ctx.lineWidth = 2 * S;
+    ctx.setLineDash([6 * S, 4 * S]);
+    ctx.strokeRect(b.x - 4 * S, b.y - 4 * S, b.w + 8 * S, b.h + 8 * S);
+    ctx.restore();
+  }
+
   // 方便除錯與自動測試：advance(秒) 直接快轉模擬，不用真的等
+  if (opt.edit) setupEditor();
   window.FishTank = {
-    handleChat, startEvent, fishes, opt,
+    handleChat, startEvent, fishes, opt, objects,
+    // 設定頁改了物件（加、刪、改大小顏色）：整份換掉重畫
+    setObjects(list, sel = selected) {
+      objects.splice(0, objects.length, ...list.map((o) => ({ ...o })));
+      selected = sel;
+      buildDecorations();
+    },
+    objectBox: (i) => objectBox(objects[i]),
     advance(sec) {
       for (let i = 0; i < sec * 60; i++) { skew += 1000 / 60; now = performance.now() + skew; update(1 / 60); }
       draw();

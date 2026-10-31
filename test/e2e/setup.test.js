@@ -3,6 +3,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const H = require('./helpers');
+const C = require('../../fish-core.js');
 
 if (!H.chromePath()) {
   test('e2e（找不到 Chrome，略過；可用 CHROME_PATH 指定）', { skip: true }, () => {});
@@ -33,14 +34,14 @@ if (!H.chromePath()) {
     await page.select('#bg', 'none');
     await page.click('[data-area="0.55,0.03,0.6,0.02"]'); // 右下角
     await typeInto(page, '#event', '0');
-    await page.click('#decos input[value="castle"]');
+    await page.click('#objPalette [data-obj="castle"]');
     const p = await obsUrl(page);
     assert.equal(p.get('channel'), 'yy2401');
     assert.equal(p.get('auto'), '0');
     assert.equal(p.get('bg'), 'none');
     assert.deepEqual(['top', 'bottom', 'left', 'right'].map((k) => p.get(k)), ['0.55', '0.03', '0.6', '0.02']);
     assert.equal(p.get('event'), '0');
-    assert.equal(p.get('deco'), 'castle,chest,coral,bubbler');
+    assert.deepEqual(C.parseObjects(p.get('objs')).map((o) => o.t), ['chest', 'coral', 'bubbler', 'castle'], '預設三個物件，再加一座城堡');
     assert.ok(!p.has('demo'));
     await page.waitForFunction(() => /demo=1/.test(document.getElementById('preview').src));
     // 全畫面按鈕把範圍清掉
@@ -156,8 +157,18 @@ if (!H.chromePath()) {
     await page.click('#customColor');
     assert.notEqual(await page.$eval('#colorRow', (e) => getComputedStyle(e).display), 'none');
     p = await obsUrl(page);
-    assert.equal(p.get('water'), '#ff9a6b,#4a2a6a', '自訂顏色從目前的主題開始');
+    assert.equal(p.get('water'), '#ff9a6b,#c45a8a,#4a2a6a', '自訂顏色從目前的主題開始');
     assert.equal(p.get('sand'), '#e8b98a');
+    assert.equal(p.get('air'), '#ffc58a');
+    // 色碼表：點色塊打開色票、點一格就套用；也可以直接打色碼
+    const rockField = await page.$$('#colorRow .cf');
+    await (await rockField[5].$('.cf-sw')).click();
+    await (await rockField[5].$('.cf-grid button:nth-child(1)')).click();
+    assert.match((await obsUrl(page)).get('rock'), /^#[0-9a-f]{6}$/);
+    const hex = await rockField[8].$('.cf-hex');
+    await hex.click({ clickCount: 3 });
+    await hex.type('#123abc');
+    assert.equal((await obsUrl(page)).get('line'), '#123abc');
     await page.click('#layers input[value="rays"]');
     await page.click('#layers input[value="rocks"]');
     await page.select('#weed', '3');
@@ -174,5 +185,64 @@ if (!H.chromePath()) {
     assert.equal(p.get('hide'), 'rays,rocks');
     assert.equal(await page.$eval('#layers input[value="rays"]', (e) => e.checked), false);
     assert.deepEqual(page.errors, []);
+  });
+
+  test('魚缸物件：加物件、調大小、翻轉、換顏色、刪除，在預覽上拖曳位置也會寫進網址', async (t) => {
+    const page = await open(t);
+    const objs = async () => C.parseObjects((await obsUrl(page)).get('objs'));
+    await page.click('#objPalette [data-obj="ship"]');
+    let list = await objs();
+    assert.equal(list.length, 4);
+    assert.equal(list[3].t, 'ship');
+    assert.equal(await page.$eval('#objPanel', (e) => e.hidden), false, '選到剛加的物件');
+    assert.equal(await page.$eval('#objName', (e) => e.textContent), '沉船');
+
+    await page.$eval('#objSize', (e) => { e.value = '2'; e.dispatchEvent(new Event('input')); });
+    await page.click('#objFlip');
+    await page.click('#objColor .cf-sw');
+    await page.click('#objColor .cf-grid button:nth-child(13)');
+    list = await objs();
+    assert.equal(list[3].s, 2);
+    assert.equal(list[3].f, true);
+    assert.match(list[3].c, /^#[0-9a-f]{6}$/);
+
+    // 預覽是編輯模式：按住沉船拖到左上角
+    const frame = await (await page.$('#preview')).contentFrame();
+    await frame.waitForFunction(() => window.FishTank && FishTank.objects.length === 4);
+    await page.$eval('#preview', (e) => e.scrollIntoView({ block: 'center' })); // 剛才點顏色時頁面捲下去了
+    const box = await frame.evaluate(() => FishTank.objectBox(3));
+    const rect = await page.$eval('#preview', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width }; });
+    const scale = rect.w / await frame.evaluate(() => innerWidth);
+    const from = { x: rect.x + (box.x + box.w / 2) * scale, y: rect.y + (box.y + box.h / 2) * scale };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(rect.x + 40 * scale, rect.y + 200 * scale, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForFunction(() => { const p = new URLSearchParams(document.getElementById('url').value.split('?')[1]); return p.get('objs').split('|')[3].split('~')[1] < 0.3; });
+    list = await objs();
+    assert.ok(list[3].x < 0.3, '拖到左邊');
+    assert.notEqual(list[3].y, null, '拖離沙地就浮在水中');
+
+    await page.click('#objFloor');
+    assert.equal((await objs())[3].y, null, '放回沙地');
+    await page.click('#objDel');
+    assert.equal((await objs()).length, 3);
+    assert.equal(await page.$eval('#objPanel', (e) => e.hidden), true);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('魚缸物件：上傳自己的物件圖，縮小後放進網址', async (t) => {
+    const page = await open(t);
+    const file = require('node:path').join(require('node:os').tmpdir(), 'fishtank-obj.png');
+    const big = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 500; c.height = 500; c.getContext('2d').fillRect(0, 0, 500, 500); return c.toDataURL('image/png').split(',')[1]; });
+    require('node:fs').writeFileSync(file, Buffer.from(big, 'base64'));
+    await (await page.$('#objFile')).uploadFile(file);
+    await page.waitForFunction(() => /img0/.test(document.getElementById('url').value));
+    const p = await obsUrl(page);
+    assert.equal(p.getAll('oimg').length, 1);
+    assert.match(p.getAll('oimg')[0], /^data:image\/(webp|png);base64,/);
+    assert.equal(C.parseObjects(p.get('objs'), 1).at(-1).t, 'img0');
+    await page.click('#objDel');
+    assert.equal((await obsUrl(page)).getAll('oimg').length, 0, '刪掉物件時圖也一起拿掉');
   });
 }

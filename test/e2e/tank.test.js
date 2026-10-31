@@ -3,6 +3,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const H = require('./helpers');
+const C = require('../../fish-core.js');
 
 if (!H.chromePath()) {
   test('e2e（找不到 Chrome，略過；可用 CHROME_PATH 指定）', { skip: true }, () => {});
@@ -409,5 +410,41 @@ if (!H.chromePath()) {
     await chat(page, 'amy', '!我的魚 https://img.example.com/amy.png');
     assert.deepEqual((await peek(page)).pending, []);
     assert.match((await fish(page, 'amy')).say, /沒有開放/);
+  });
+
+  test('魚缸物件：網址裡的物件都畫得出來，舊網址的 deco 也還能用', async (t) => {
+    const all = C.OBJECT_IDS.map((t, i) => `${t}~${(i + 0.5) / 12}~~1~${i % 2}~`).join('|') + '|anchor~0.5~0.4~2~0~ff0000';
+    let page = await open(t, '&objs=' + encodeURIComponent(all));
+    await advance(page, 0.2);
+    assert.equal(await page.evaluate(() => FishTank.objects.length), 13);
+    assert.deepEqual(page.errors, []);
+    page = await open(t, '&deco=castle,ship');
+    assert.deepEqual(await page.evaluate(() => FishTank.objects.map((o) => o.t)), ['castle']);
+    page = await open(t, '&objs=');
+    assert.equal(await page.evaluate(() => FishTank.objects.length), 0);
+  });
+
+  test('觀眾自訂：副色、配件色、大小、名牌、表情，重新整理後還記得', async (t) => {
+    const page = await open(t);
+    await chat(page, 'amy', '!魚');
+    const L0 = await page.evaluate(() => FishTank.fishes.get('amy').size);
+    for (const cmd of ['!副色 藍', '!戴 皇冠', '!配件色 粉', '!大小 大', '!名牌 #ff66aa', '!表情 愛心眼']) { await chat(page, 'amy', cmd); await advance(page, 6); }
+    const look = () => page.evaluate(() => { const f = FishTank.fishes.get('amy'); return { color2: f.color2, wearColor: f.wearColor, sizePick: f.sizePick, tag: f.tag, face: f.expr }; });
+    assert.deepEqual(await look(), { color2: '#3fa4ff', wearColor: '#ff8ccf', sizePick: 'large', tag: '#ff66aa', face: 'love' });
+    assert.equal(L0, 1);
+    for (const face of ['開心', '生氣', '想睡', '驚訝', '星星眼', '眨眼', '暈']) { await chat(page, 'amy', '!表情 ' + face); await advance(page, 3.5); }
+    for (const sp of ['!鯊魚', '!水母', '!河豚']) { await chat(page, 'amy', sp); await advance(page, 6); }
+    assert.deepEqual(page.errors, [], '每種表情、每種魚都畫得出來');
+    await chat(page, 'amy', '!名牌 隱藏');
+    await advance(page, 0.2);
+    const names = await page.evaluate(() => FishTank.peek().placed.length);
+    assert.equal(names, 0, '名牌藏起來就不畫名字');
+    await H.sleep(800);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.FishTank);
+    await chat(page, 'amy', '我回來了');
+    assert.deepEqual(await look(), { color2: '#3fa4ff', wearColor: '#ff8ccf', sizePick: 'large', tag: 'hide', face: 'dizzy' });
+    await chat(page, 'amy', '!副色 關');
+    assert.equal(await page.evaluate(() => FishTank.fishes.get('amy').color2), null);
   });
 }

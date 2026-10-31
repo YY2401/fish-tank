@@ -50,7 +50,12 @@
     feed: ['feed', '餵', '餵食', '飼料'],
     follow: ['follow', '跟', '跟隨'],
     hug: ['hug', '抱', '抱抱', 'kiss', '親'],
-    avatar: ['avatar', '頭像', '臉', 'face'],
+    avatar: ['avatar', '頭像', '臉'],
+    color2: ['color2', '副色', '鰭色', '第二顏色'],
+    wearcolor: ['wearcolor', '配件色', '配件顏色'],
+    size: ['size', '大小', '體型'],
+    tag: ['tag', 'nametag', '名牌'],
+    face: ['face', 'expr', '表情', '眼睛'],
     wear: ['wear', '戴', '配件', '穿'],
     pattern: ['pattern', '花紋', '圖案'],
     mine: ['myfish', '我的魚', '我的圖'],
@@ -80,6 +85,21 @@
     stars: { name: '星星', aliases: ['星星', 'stars'] },
     hearts: { name: '愛心', aliases: ['愛心', 'hearts'] },
   };
+  const EXPRESSIONS = {
+    happy: { name: '開心', aliases: ['開心', '笑', 'happy'] },
+    angry: { name: '生氣', aliases: ['生氣', '怒', 'angry'] },
+    love: { name: '愛心眼', aliases: ['愛心眼', '愛心', 'love'] },
+    sleepy: { name: '想睡', aliases: ['想睡', '睏', 'sleepy'] },
+    surprised: { name: '驚訝', aliases: ['驚訝', '嚇到', 'surprised'] },
+    star: { name: '星星眼', aliases: ['星星眼', '星星', 'star'] },
+    wink: { name: '眨眼', aliases: ['眨眼', 'wink'] },
+    dizzy: { name: '暈', aliases: ['暈', '頭暈', 'dizzy'] },
+  };
+  const SIZES = {
+    small: { name: '小', k: 0.75, aliases: ['小', 's', 'small'] },
+    medium: { name: '中', k: 1, aliases: ['中', '普通', 'm', 'medium'] },
+    large: { name: '大', k: 1.35, aliases: ['大', 'l', 'large'] },
+  };
   const OFF = ['關', '關掉', '取消', '拿掉', '不要', 'off', 'none'];
   // 「帽子」「crown」→ ID；「關」→ ''；不認得 → null
   function findIn(table, word) {
@@ -90,11 +110,13 @@
   }
   const findWear = (w) => findIn(WEARS, w);
   const findPattern = (w) => findIn(PATTERNS, w);
+  const findExpression = (w) => findIn(EXPRESSIONS, w);
+  const findSize = (w) => findIn(SIZES, w);
 
   // 圖片網址：https，或設定頁縮小後直接放進網址的圖（data:image/…;base64）
   const IMAGE_URL = /^(https:\/\/\S+|data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+)$/;
 
-  const COOLDOWN = { jump: 4000, dash: 3000, spin: 4000, bubble: 3000, feed: 15000, hug: 8000, skin: 5000, color: 3000, help: 30000, wear: 3000, pattern: 3000, mine: 60000 };
+  const COOLDOWN = { jump: 4000, dash: 3000, spin: 4000, bubble: 3000, feed: 15000, hug: 8000, skin: 5000, color: 3000, help: 30000, wear: 3000, pattern: 3000, mine: 60000, color2: 3000, wearcolor: 3000, size: 5000, tag: 3000, face: 3000 };
 
   // 大事件與忠誠點品項可以觸發的動作
   const EVENTS = { shark: '鯊魚出沒', whirl: '大漩渦', treasure: '寶箱掉落', school: '魚群' };
@@ -124,15 +146,52 @@
     return '#' + [16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, '0')).join('');
   }
 
-  // 網址參數 → 背景配色：主題，再套上自訂的水色（淺,深）和沙色
-  function resolveTheme(id, water, sand) {
+  // 網址參數 → 背景配色：主題，再套上自訂的顏色
+  // water=水面,深處 或 水面,中間,深處；air=天空；sand、rock、weed（海草）；ray（光線）；line（水面線）
+  function resolveTheme(id, water, sand, more = {}) {
     const base = THEMES[id] || THEMES.ocean;
-    const t = { ...base, water: base.water.slice(), sand: base.sand.slice() };
-    const [top, bottom] = String(water || '').split(',').map(hex6);
-    if (top && bottom) t.water = [top, mixHex(top, bottom, 0.5), bottom];
+    const t = { ...base, water: base.water.slice(), sand: base.sand.slice(), air: base.air.slice(), rock: base.rock.slice(), weed: base.weed.slice(), line: base.line || '#c8f0ff' };
+    const w = String(water || '').split(',').map(hex6);
+    if (w.length === 2 && w[0] && w[1]) t.water = [w[0], mixHex(w[0], w[1], 0.5), w[1]];
+    if (w.length === 3 && w.every(Boolean)) t.water = w;
     const sd = hex6(sand);
     if (sd) t.sand = [sd, mixHex(sd, '#000000', 0.35)];
+    const air = hex6(more.air);
+    if (air) t.air = [mixHex(air, '#000000', 0.25), air];
+    const rock = hex6(more.rock);
+    if (rock) t.rock = [rock, mixHex(rock, '#000000', 0.55)];
+    const weed = hex6(more.weed);
+    if (weed) t.weed = [weed, mixHex(weed, '#000000', 0.2), mixHex(weed, '#ffffff', 0.3)];
+    const ray = hex6(more.ray);
+    if (ray) { const n = parseInt(ray.slice(1), 16); t.ray = `${n >> 16},${(n >> 8) & 255},${n & 255}`; }
+    const line = hex6(more.line);
+    if (line) t.line = line;
     return t;
+  }
+
+  // ── 魚缸物件 ──
+  // 物件種類（畫法在 objects.js）；網址參數 objs=種類~x~y~大小~翻轉~顏色|…
+  // x、y 是在魚缸範圍裡的位置（0～1，y 是物件底部；空白 = 放在沙地上）；自訂圖片的種類是 img0、img1…（對應 oimg 參數）
+  const OBJECT_IDS = ['castle', 'chest', 'coral', 'bubbler', 'ship', 'helmet', 'shell', 'starfish', 'rock', 'plant', 'anchor', 'pillar'];
+  const num3 = (v, lo, hi, d) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+  function parseObjects(str, imgCount = 0) {
+    const out = [];
+    for (const part of String(str || '').split('|')) {
+      const [t, x, y, sc, f, c] = part.split('~');
+      const img = /^img(\d)$/.exec(t || '');
+      if (!OBJECT_IDS.includes(t) && !(img && +img[1] < imgCount)) continue;
+      out.push({ t, x: num3(x, 0, 1, 0.5), y: y === '' || y === undefined ? null : num3(y, 0, 1, null), s: num3(sc, 0.2, 4, 1), f: f === '1', c: hex6(c) || '' });
+      if (out.length >= 40) break;
+    }
+    return out;
+  }
+  function stringifyObjects(list) {
+    const r = (v, d) => String(+(+v).toFixed(d));
+    return (list || []).map((o) => [o.t, r(o.x, 3), o.y === null || o.y === undefined ? '' : r(o.y, 3), r(o.s, 2), o.f ? '1' : '0', (o.c || '').replace('#', '')].join('~')).join('|');
+  }
+  // 舊網址的 deco=城堡,寶箱… → 平均排在沙地上
+  function decoToObjects(deco) {
+    return deco.map((t, i) => ({ t, x: ((i + 0.5) / deco.length) * 0.84 + 0.08, y: null, s: 1, f: false, c: '' }));
   }
 
   // 「品項ID:動作,品項ID:動作」↔ { 品項ID: 動作 }
@@ -333,7 +392,7 @@
       const v = parseFloat(p.get(k));
       return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : DEFAULTS[k];
     };
-    return {
+    const o = {
       channel: (p.get('channel') || '').trim().replace(/^#/, '').toLowerCase(),
       auto: bool('auto'),
       say: bool('say'),
@@ -354,13 +413,17 @@
       skey: p.get('skey') || '',
       skins: parseSkins(p.getAll('skin')),
       pfp: bool('pfp'),
-      theme: resolveTheme(p.get('theme'), p.get('water'), p.get('sand')),
+      theme: resolveTheme(p.get('theme'), p.get('water'), p.get('sand'), { air: p.get('air'), rock: p.get('rock'), weed: p.get('weedc'), ray: p.get('ray'), line: p.get('line') }),
       themeId: THEMES[p.get('theme')] ? p.get('theme') : 'ocean',
       hide: (p.get('hide') || '').split(',').map((x) => x.trim()).filter((x) => LAYERS[x]),
       weed: Math.round(num('weed', 0, 3)),
       bgimg: /^https:\/\//.test(p.get('bgimg') || '') ? p.get('bgimg') : '',
       submit: bool('submit'),
+      objimgs: p.getAll('oimg').filter((u) => IMAGE_URL.test(u)).slice(0, 10),
     };
+    o.objects = p.has('objs') ? parseObjects(p.get('objs'), o.objimgs.length) : decoToObjects(o.deco);
+    o.edit = p.get('edit') === '1';
+    return o;
   }
 
   // 用名字算出固定的預設魚種，同一個人每次進來都一樣
@@ -374,5 +437,5 @@
     return common[hashStr(login) % common.length];
   }
 
-  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, THEMES, LAYERS, resolveTheme, mixHex, hex6, WEARS, PATTERNS, findWear, findPattern, IMAGE_URL, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
+  return { SPECIES, SPECIES_IDS, RARE_IDS, EVENTS, REWARD_ACTIONS, DECOS, parseRewards, stringifyRewards, pickRare, fitArea, parseSkins, firstEmote, emoteUrl, EVERYONE, THEMES, LAYERS, resolveTheme, mixHex, hex6, WEARS, PATTERNS, findWear, findPattern, IMAGE_URL, EXPRESSIONS, SIZES, findExpression, findSize, OFF, OBJECT_IDS, parseObjects, stringifyObjects, decoToObjects, COLORS, COMMANDS, COOLDOWN, DEFAULTS, findSpecies, findColor, parseCommand, cooldownOk, parseIrc, badgesOf, noticeOf, readOptions, defaultSpecies, hashStr };
 });

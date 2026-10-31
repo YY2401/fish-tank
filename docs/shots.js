@@ -104,8 +104,37 @@ async function shotPage(page, name) {
   await shotRange(page, 'setup-look', `${leftSec(2)} h2`, 'label:has(#bgimg)');
   await page.click('[data-theme="ocean"]');
 
-  await mark(page, ['#decos', '#event']);
+  // 色碼表：勾「自己選顏色」，打開第一個顏色的色票
+  await page.click('#customColor');
+  await page.click('#colorRow .cf-sw');
+  await mark(page, []);
+  const colorClip = await page.evaluate(() => {
+    const a = document.getElementById('customColor').closest('label').getBoundingClientRect();
+    const pop = document.querySelector('#colorRow .cf-pop').getBoundingClientRect();
+    const row = document.getElementById('colorRow').getBoundingClientRect();
+    const card = document.getElementById('colorRow').closest('section').getBoundingClientRect();
+    return { x: card.left, y: a.top - 10 + scrollY, width: card.width, height: Math.max(pop.bottom, row.bottom) - a.top + 20 };
+  });
+  await page.screenshot({ path: path.join(OUT, 'setup-colors.png'), clip: colorClip });
+  console.log('shot setup-colors');
+  await page.click('h1');
+  await page.click('#customColor');
+
+  await mark(page, ['#event']);
   await shotRange(page, 'setup-deco', '#decoLbl', 'label:has(#event)');
+
+  // 物件編輯：加幾個物件、選一個（預覽上出現黃色虛線框）
+  await page.click('#objPalette [data-obj="ship"]');
+  await page.click('#objPalette [data-obj="starfish"]');
+  await page.click('#objPalette [data-obj="helmet"]');
+  await page.$eval('#objSize', (e) => { e.value = '1.4'; e.dispatchEvent(new Event('input')); });
+  await sleep(2500);
+  await mark(page, ['#objPalette', '#objPanel']);
+  await shotEl(page, 'setup-objects-preview', '#preview');
+  await shotRange(page, 'setup-objects', '#objEditor h2', '#objEditor .obj-foot', 14, 10);
+  await mark(page, []);
+  page.once('dialog', (d) => d.accept()); // 「全部清掉」會先問一次
+  await page.click('#objClear');
 
   // 上傳一張圖（示範用的小雞），會縮小後直接放進網址
   await page.type('#skinName', '小雞');
@@ -227,6 +256,39 @@ async function shotPage(page, name) {
   });
   await tank.screenshot({ path: path.join(OUT, 'tank-custom.png'), clip: box });
   console.log('shot tank-custom');
+
+  // 魚缸物件：沉船、遺跡、潛水頭盔…組合出來的魚缸
+  const layout = ['pillar~0.06~~1.1~0~', 'pillar~0.13~~0.7~1~', 'rock~0.1~~1~0~', 'ship~0.33~~1.2~0~', 'plant~0.5~~1.1~0~', 'coral~0.58~~1.2~0~',
+    'helmet~0.7~~1.1~0~', 'anchor~0.8~~1~1~', 'shell~0.66~~1~0~', 'starfish~0.88~~1.2~0~', 'chest~0.95~~0.9~1~', 'bubbler~0.45~~1.4~0~',
+    'coral~0.22~~0.8~1~ffb347', 'starfish~0.26~~1~0~ffd23f'].join('|');
+  await openTank(`theme=tropical&tip=0&weed=1&objs=${encodeURIComponent(layout)}`);
+  await fill(8);
+  await tank.evaluate(() => FishTank.advance(8));
+  await sleep(400);
+  await shotPage(tank, 'tank-objects');
+
+  // 觀眾自訂：副色、大小、表情、名牌
+  await openTank('objs=&tip=0&weed=1&scale=1.6');
+  await tank.evaluate(() => {
+    const looks = [['小魚乾', '!金魚', ['!副色 藍', '!表情 愛心眼', '!大小 大']], ['阿宅不睡覺', '!小丑魚', ['!表情 想睡', '!名牌 #ffd84a']],
+      ['Momo_TW', '!河豚', ['!表情 星星眼', '!副色 粉']], ['路過的貓', '!神仙魚', ['!表情 生氣', '!副色 #ff4a4a', '!戴 皇冠', '!配件色 青']],
+      ['kiwi_kiwi', '!鯊魚', ['!表情 開心', '!大小 小', '!名牌 #7cf5a0']], ['布丁狗', '!金魚', ['!表情 暈', '!副色 彩虹']], ['大吉大利', '!錦鯉', ['!表情 驚訝']]];
+    looks.forEach(([name, sp, cmds], i) => {
+      const say = (t) => FishTank.handleChat({ login: 'x' + i, display: name, text: t, badges: { broadcaster: true } });
+      say('!魚'); say(sp); cmds.forEach(say);
+    });
+  });
+  await tank.evaluate(() => FishTank.advance(10));
+  await sleep(500);
+  const xbox = await tank.evaluate(() => {
+    const fs = [...FishTank.fishes.values()];
+    const xs = fs.map((f) => f.x), ys = fs.map((f) => f.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const w = 860, h = 480;
+    return { x: Math.max(0, Math.min(innerWidth - w, cx - w / 2)), y: Math.max(0, Math.min(innerHeight - h, cy - h / 2)), width: w, height: h };
+  });
+  await tank.screenshot({ path: path.join(OUT, 'tank-looks.png'), clip: xbox });
+  console.log('shot tank-looks');
 
   // 觀眾打扮：配件與花紋
   await openTank('deco=coral&tip=0&weed=1&scale=1.6');

@@ -39,7 +39,7 @@
       "duration": 5.5
     },
     {
-      "caption": "「2. 魚缸外觀」點一個配色就換背景，光線、石頭、海草也可以自己決定要不要",
+      "caption": "「2. 魚缸外觀」點一個配色就換背景；勾「自己選顏色」可以用色碼表調九種顏色",
       "highlight": "#themes",
       "duration": 5.5,
       "before": [
@@ -55,13 +55,20 @@
       ]
     },
     {
-      "caption": "再往下勾選魚缸裝飾，設定大事件（鯊魚、漩渦、寶箱）多久來一次",
-      "highlight": "#decos",
+      "caption": "預覽下面的「魚缸物件」點一個就加進魚缸，在預覽上直接拖曳位置、滾輪調大小",
+      "highlight": "#objPalette",
       "before": [
         {
-          "scroll": "#event"
+          "scroll": "#objPanel"
+        },
+        {
+          "click": "#objPalette [data-obj=\"ship\"]"
+        },
+        {
+          "wait": 1500
         }
-      ]
+      ],
+      "duration": 6
     },
     {
       "caption": "想要本頻道限定魚種：取個名字、按「上傳」選一張圖，觀眾打 !名字 就能變身",
